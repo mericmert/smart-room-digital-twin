@@ -1,0 +1,16 @@
+{
+  "features": [
+    "Temperature",
+    "Humidity",
+    "Light",
+    "CO2",
+    "HumidityRatio",
+    "hour",
+    "dayofweek",
+    "is_weekend"
+  ],
+  "best_params": {
+    "clf__C": 1.0,
+    "clf__penalty": "l2"
+  }
+}
