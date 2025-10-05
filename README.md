@@ -18,20 +18,18 @@ pip install -e .
 Train with temporal CV and export artifacts:
 ```bash
 occ-ml-train \
-  --train-txt data/datatraining.txt \
-  --timestamp date \
-  --artifact-dir ./out_artifacts \
-  --target Occupancy
+  --data data/datatraining.txt \
+  --artifact-dir artifacts/occ_v1 \
+  --n-splits 5 \
+  --gap 5
 ```
 
 Evaluate on a separate holdout (with optional diagnostics):
 ```bash
 occ-ml-eval \
   --data data/datatest.txt \
-  --timestamp date \
-  --artifacts ./out_artifacts \
-  --target Occupancy \
-  --plot-dir ./out_artifacts/plots
+  --artifacts artifacts/occ_v1 \
+  --out evaluation/
 ```
 
 Artifacts saved:
