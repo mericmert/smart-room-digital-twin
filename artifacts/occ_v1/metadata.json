@@ -1,0 +1,42 @@
+{
+  "best_params": {
+    "clf__C": 0.01,
+    "clf__penalty": "l1",
+    "clf__solver": "saga"
+  },
+  "best_cv_average_precision": 0.9608978961788541,
+  "train_metrics": {
+    "average_precision": 0.9234012462119688,
+    "roc_auc": 0.9922430563708688,
+    "precision": 0.9503585217870932,
+    "recall": 0.9965297860034702,
+    "f1": 0.9728966685488425,
+    "specificity": 0.9859681945743686,
+    "balanced_accuracy": 0.9912489902889194,
+    "mcc": 0.9658126375100142,
+    "accuracy": 0.9882107331450325,
+    "prevalence": 0.2123296082524868,
+    "tn": 6324,
+    "fp": 90,
+    "fn": 6,
+    "tp": 1723,
+    "threshold": 0.780070378972667
+  },
+  "n_requested_splits": 5,
+  "effective_n_splits": 2,
+  "cv_fold_positive_counts": [
+    181,
+    588
+  ],
+  "gap": 5,
+  "random_state": 42,
+  "selected_threshold": 0.780070378972667,
+  "threshold_selection": {
+    "threshold": 0.780070378972667,
+    "objective": "f_beta",
+    "beta": 1.0,
+    "score": 0.9948119325551232,
+    "source": "temporal_cv_oof",
+    "n_oof_predictions": 5428
+  }
+}
