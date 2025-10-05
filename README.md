@@ -31,11 +31,3 @@ occ-ml-eval \
   --artifacts artifacts/occ_v1 \
   --out evaluation/
 ```
-
-Artifacts saved:
-- `model.joblib` — fitted pipeline
-- `features.json` — feature list used by the model
-- `threshold.json` — operating threshold chosen via OOF predictions
-- `metrics_train_cv.json` — CV metrics (AP, ROC-AUC, Brier)
-- `metrics_*.json` — test/holdout metrics
-- `pr_curve_*.png`, `roc_curve_*.png`, `calibration_*.png`
