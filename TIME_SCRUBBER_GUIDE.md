@@ -19,7 +19,6 @@ The Time Scrubber feature allows you to replay historical sensor data from CSV f
 ### 3. Playback Controls
 - **Play/Stop**: Start and stop time-based playback
 - **Speed Control**: Adjust playback speed (0.5x to 10x)
-- **Time Window**: Set data window size (1 min to 1 hour)
 
 ### 4. Data Integration
 - **Kafka Integration**: Send selected data points to Kafka for ML processing
@@ -44,7 +43,6 @@ The Time Scrubber is integrated into the main web client interface. It appears a
 
 ### 4. Playback Data
 1. Set your desired playback speed (0.5x to 10x)
-2. Choose a time window size for data context
 3. Click "Play" to start time-based playback
 4. Click "Stop" to pause playback
 

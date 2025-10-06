@@ -49,13 +49,12 @@ The TimeScrubber component has been simplified to focus exclusively on playback 
 ### Basic Playback
 1. **Select Data File**: Choose from available historical data files
 2. **Set Time Range**: Use datetime picker or start/end buttons
-3. **Configure Playback**: Set speed (0.5x to 10x) and time window
+3. **Configure Playback**: Set speed (0.5x to 10x)
 4. **Start Playback**: Click play button to begin historical data playback
 5. **Monitor Results**: View sensor data and ML predictions in real-time
 
 ### Features
 - **Speed Control**: Playback at various speeds for analysis
-- **Time Window**: Focus on specific time periods
 - **Chart Visualization**: View data trends over time
 - **ML Predictions**: Automatic occupancy predictions for each data point
 

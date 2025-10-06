@@ -42,7 +42,6 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
   const [currentData, setCurrentData] = useState<SensorDataPoint | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [windowMinutes, setWindowMinutes] = useState(5);
   const [message, setMessage] = useState('');
   const [prediction, setPrediction] = useState<{ occupancy: number; probability: number } | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -117,11 +116,17 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
   const loadDataAtTime = async (time: string) => {
     if (!selectedFile || !time) return;
 
-    
     try {
+      // Validate the time format
+      const targetTime = new Date(time);
+      if (isNaN(targetTime.getTime())) {
+        setMessage('Invalid time format. Please select a valid date and time.');
+        return;
+      }
+
       // Load sensor data
       const response = await fetch(
-        `/api/replay?action=get-data&filename=${selectedFile}&time=${time}&windowMinutes=${windowMinutes}`
+        `/api/replay?action=get-data&filename=${selectedFile}&time=${time}`
       );
       const data = await response.json();
       
@@ -266,7 +271,9 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
 
   const handleTimeChange = (time: string) => {
     setCurrentTime(time);
-    loadDataAtTime(time);
+    if (time) {
+      loadDataAtTime(time);
+    }
   };
 
   const handleFileChange = async (filename: string) => {
@@ -352,7 +359,15 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                     <input
                       type="datetime-local"
                       value={currentTime ? new Date(currentTime).toISOString().slice(0, 16) : ''}
-                      onChange={(e) => handleTimeChange(e.target.value ? new Date(e.target.value).toISOString() : '')}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          // Convert datetime-local format (YYYY-MM-DDTHH:MM) to ISO string
+                          const localDateTime = new Date(e.target.value);
+                          handleTimeChange(localDateTime.toISOString());
+                        } else {
+                          handleTimeChange('');
+                        }
+                      }}
                       min={timeRange.start ? new Date(timeRange.start).toISOString().slice(0, 16) : ''}
                       max={timeRange.end ? new Date(timeRange.end).toISOString().slice(0, 16) : ''}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm"
@@ -420,43 +435,23 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                     </button>
                   </div>
 
-                  {/* Speed and Window Controls */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Playback Speed
-                      </label>
-                      <select
-                        value={playbackSpeed}
-                        onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        disabled={isPlaying}
-                      >
-                        <option value={0.5}>0.5x</option>
-                        <option value={1}>1x</option>
-                        <option value={2}>2x</option>
-                        <option value={5}>5x</option>
-                        <option value={10}>10x</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Time Window
-                      </label>
-                      <select
-                        value={windowMinutes}
-                        onChange={(e) => setWindowMinutes(Number(e.target.value))}
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        disabled={isPlaying}
-                      >
-                        <option value={1}>1 min</option>
-                        <option value={5}>5 min</option>
-                        <option value={15}>15 min</option>
-                        <option value={30}>30 min</option>
-                        <option value={60}>1 hour</option>
-                      </select>
-                    </div>
+                  {/* Speed Controls */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Playback Speed
+                    </label>
+                    <select
+                      value={playbackSpeed}
+                      onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={isPlaying}
+                    >
+                      <option value={0.5}>0.5x</option>
+                      <option value={1}>1x</option>
+                      <option value={2}>2x</option>
+                      <option value={5}>5x</option>
+                      <option value={10}>10x</option>
+                    </select>
                   </div>
 
                   {/* Progress Indicator */}

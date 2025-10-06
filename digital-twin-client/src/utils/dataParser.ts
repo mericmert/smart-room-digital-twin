@@ -117,17 +117,6 @@ export class DataParser {
     return closest;
   }
 
-  static getDataInTimeWindow(
-    data: SensorDataPoint[], 
-    centerTime: Date, 
-    windowMinutes: number
-  ): SensorDataPoint[] {
-    const halfWindow = windowMinutes * 60 * 1000 / 2; // Convert to milliseconds
-    const startTime = new Date(centerTime.getTime() - halfWindow);
-    const endTime = new Date(centerTime.getTime() + halfWindow);
-    
-    return this.filterDataByTimeRange(data, startTime, endTime);
-  }
 
   static formatSensorDataForKafka(dataPoint: SensorDataPoint): any {
     return {

@@ -45,7 +45,6 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get('action');
     const filename = searchParams.get('filename');
     const time = searchParams.get('time');
-    const windowMinutes = searchParams.get('windowMinutes');
 
     console.log(`[Replay API] GET request - action: ${action}, filename: ${filename}, time: ${time}`);
 
@@ -103,24 +102,6 @@ export async function GET(request: NextRequest) {
           );
         }
 
-        // If window is specified, get data in time window
-        if (windowMinutes) {
-          const windowData = DataParser.getDataInTimeWindow(
-            fileData.data, 
-            targetTime, 
-            parseInt(windowMinutes)
-          );
-          return NextResponse.json({
-            success: true,
-            data: {
-              ...fileData,
-              data: windowData,
-              totalRecords: windowData.length
-            },
-            currentTime: targetTime.toISOString(),
-            windowMinutes: parseInt(windowMinutes)
-          });
-        }
 
         return NextResponse.json({
           success: true,

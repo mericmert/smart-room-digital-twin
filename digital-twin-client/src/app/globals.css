@@ -1,8 +1,79 @@
 @import "tailwindcss";
+@import "../styles/theme.css";
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* Theme Color Variables */
+  --color-text-primary: #171717;
+  --color-text-secondary: #6b7280;
+  --color-text-tertiary: #9ca3af;
+  --color-text-muted: #d1d5db;
+  --color-text-inverse: #ffffff;
+  
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f9fafb;
+  --color-bg-tertiary: #f3f4f6;
+  --color-bg-card: #ffffff;
+  
+  --color-border-primary: #e5e7eb;
+  --color-border-secondary: #d1d5db;
+  --color-border-focus: #3b82f6;
+  
+  --color-primary: #3b82f6;
+  --color-primary-light: #dbeafe;
+  --color-primary-hover: #2563eb;
+  
+  --color-success: #10b981;
+  --color-success-light: #d1fae5;
+  
+  --color-warning: #f59e0b;
+  --color-warning-light: #fef3c7;
+  
+  --color-error: #ef4444;
+  --color-error-light: #fee2e2;
+  
+  --color-info: #06b6d4;
+  --color-info-light: #cffafe;
+  
+  --color-temperature: #f97316;
+  --color-temperature-light: #fed7aa;
+  
+  --color-humidity: #0ea5e9;
+  --color-humidity-light: #bae6fd;
+  
+  --color-light: #eab308;
+  --color-light-light: #fef08a;
+  
+  --color-co2: #22c55e;
+  --color-co2-light: #bbf7d0;
+  
+  --color-occupancy-occupied: #ef4444;
+  --color-occupancy-vacant: #10b981;
+  
+  --color-shadow-sm: rgba(0, 0, 0, 0.05);
+  --color-shadow-md: rgba(0, 0, 0, 0.1);
+  
+  /* Typography */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  
+  /* Spacing */
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  
+  /* Border radius */
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
 }
 
 @theme inline {
@@ -16,6 +87,19 @@
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    
+    --color-text-primary: #ededed;
+    --color-text-secondary: #a1a1aa;
+    --color-text-tertiary: #71717a;
+    --color-text-muted: #3f3f46;
+    
+    --color-bg-primary: #0a0a0a;
+    --color-bg-secondary: #18181b;
+    --color-bg-tertiary: #27272a;
+    --color-bg-card: #18181b;
+    
+    --color-border-primary: #3f3f46;
+    --color-border-secondary: #52525b;
   }
 }
 
