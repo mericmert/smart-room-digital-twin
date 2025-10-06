@@ -8,13 +8,12 @@ from typing import Callable
 from kafka import KafkaConsumer
 
 from ..config import KAFKA_BOOTSTRAP_SERVERS, KAFKA_GROUP_ID, KAFKA_TOPIC
-from .websocket import manager
 
 logger = logging.getLogger(__name__)
 
 
 def kafka_consumer(prediction_callback: Callable[[dict], dict]) -> None:
-    """Kafka consumer that processes sensor data through ML model and sends results to web clients."""
+    """Kafka consumer that processes sensor data through ML model."""
     try:
         consumer = KafkaConsumer(
             KAFKA_TOPIC,
@@ -35,9 +34,6 @@ def kafka_consumer(prediction_callback: Callable[[dict], dict]) -> None:
                 
                 # Process through ML model using callback
                 prediction_result = prediction_callback(sensor_data)
-                
-                # Queue message for WebSocket broadcasting (thread-safe)
-                manager.queue_message(json.dumps(prediction_result))
                 
                 logger.info(f"Processed prediction: {prediction_result}")
                 

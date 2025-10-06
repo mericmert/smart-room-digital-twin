@@ -88,7 +88,7 @@ def test_ml_prediction_flow():
     print("   Waiting 5 seconds for Kafka processing...")
     time.sleep(5)
     
-    # Check ML API logs or WebSocket for processed data
+    # Check ML API logs for processed data
     try:
         response = requests.get("http://localhost:8000/health/detailed", timeout=5)
         if response.status_code == 200:
@@ -105,7 +105,7 @@ def test_ml_prediction_flow():
     print("🎉 ML Prediction Flow Test Complete!")
     print("\nNext steps:")
     print("1. Check ML API logs for Kafka consumer activity")
-    print("2. Monitor WebSocket connections for real-time predictions")
+    print("2. Check ML API logs for real-time predictions")
     print("3. Verify Kafka topic has messages")
     
     return True

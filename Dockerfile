@@ -58,5 +58,5 @@ USER root
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 USER appuser
 
-# Production optimizations - single worker for WebSocket and Kafka compatibility
+# Production optimizations - single worker for Kafka compatibility
 CMD ["uvicorn", "src.occupancy_ml.api.api:app", "--host", "0.0.0.0", "--port", "8000"]

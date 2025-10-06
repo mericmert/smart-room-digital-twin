@@ -1,18 +1,16 @@
 """FastAPI route handlers for the occupancy ML API."""
 
-import asyncio
 import logging
 import os
 from datetime import datetime
 from typing import Dict, Any
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
+from fastapi import APIRouter, HTTPException, status
 
 from ..config import KAFKA_BOOTSTRAP_SERVERS, KAFKA_TOPIC
 from .models import OccupancyRequest, OccupancyResponse, HealthResponse
 from ..ml.prediction import predict_occupancy
 from ..ml.model_manager import get_model_manager
-from .websocket import manager
 
 logger = logging.getLogger(__name__)
 
@@ -128,29 +126,3 @@ def predict(request: OccupancyRequest) -> OccupancyResponse:
         )
 
 
-@router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for real-time communication."""
-    await manager.connect(websocket)
-    logger.info("WebSocket client connected")
-    
-    try:
-        while True:
-            # Process queued messages
-            await manager.process_message_queue()
-            
-            # Check for incoming messages (with timeout)
-            try:
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
-                logger.info(f"Received WebSocket message: {data}")
-            except asyncio.TimeoutError:
-                # No message received, continue processing queue
-                continue
-            except WebSocketDisconnect:
-                break
-                
-    except WebSocketDisconnect:
-        pass
-    finally:
-        manager.disconnect(websocket)
-        logger.info("WebSocket client disconnected")

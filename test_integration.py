@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify the complete Kafka -> ML -> WebSocket integration.
+Test script to verify the complete Kafka -> ML integration.
 This script sends test sensor data to Kafka and verifies the ML processing works.
 """
 
@@ -144,7 +144,7 @@ def main():
     print("\n📋 Next steps:")
     print("   1. Open the web client: http://localhost:3000")
     print("   2. Click 'Send Sensor Data' to test the complete flow")
-    print("   3. Watch for real-time predictions via WebSocket")
+    print("   3. Check ML API logs for processed data")
 
 if __name__ == "__main__":
     main()

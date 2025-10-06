@@ -12,6 +12,7 @@ from .kafka import start_kafka_consumer
 from ..ml.prediction import process_sensor_data
 from ..ml.model_manager import initialize_model_manager
 from .routes import router
+from .data_routes import router as data_router
 
 logging.basicConfig(level=getattr(logging, LOG_LEVEL.upper()))
 logger = logging.getLogger(__name__)
@@ -65,7 +66,7 @@ app = FastAPI(
     title="Occupancy Predictor", 
     version="0.1.0", 
     lifespan=lifespan,
-    description="ML-powered occupancy prediction API with real-time Kafka integration"
+    description="ML-powered occupancy prediction API with Kafka integration"
 )
 
 # Add CORS middleware
@@ -82,3 +83,4 @@ if enable_cors:
     )
 
 app.include_router(router)
+app.include_router(data_router)
