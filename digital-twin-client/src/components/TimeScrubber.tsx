@@ -1,13 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Play, 
   Pause, 
   SkipBack, 
   SkipForward, 
-  RotateCcw, 
-  RotateCw, 
   FileText, 
   Clock, 
   Thermometer, 
@@ -17,212 +15,94 @@ import {
   Activity,
   TrendingUp,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from 'lucide-react';
-import { DataParser, SensorDataPoint, ParsedDataFile } from '@/utils/dataParser';
+import { SensorDataPoint } from '@/utils/dataParser';
+import { useDataFiles, useDataAtTime, useAllDataForFile, usePrediction } from '@/hooks/useApi';
 
 interface TimeScrubberProps {
   onDataSelect?: (data: SensorDataPoint) => void;
   onPrediction?: (prediction: { occupancy: number; probability: number }) => void;
 }
 
-interface DataFile {
-  filename: string;
-  totalRecords: number;
-  timeRange: {
-    start: string;
-    end: string;
-  };
-}
-
 export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubberProps) {
-  const [dataFiles, setDataFiles] = useState<DataFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [currentTime, setCurrentTime] = useState<string>('');
-  const [currentData, setCurrentData] = useState<SensorDataPoint | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [message, setMessage] = useState('');
   const [prediction, setPrediction] = useState<{ occupancy: number; probability: number } | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const allDataRef = useRef<SensorDataPoint[]>([]);
   const currentIndexRef = useRef<number>(0);
 
-  // Load available data files
+  const { data: dataFiles = [], isLoading: isLoadingFiles, error: filesError } = useDataFiles();
+  
+  const effectiveSelectedFile = selectedFile || (dataFiles.length > 0 ? dataFiles[0].filename : '');
+  
+  const { data: dataAtTime, isLoading: isLoadingDataAtTime, error: dataAtTimeError } = useDataAtTime(
+    effectiveSelectedFile, 
+    currentTime, 
+    !!effectiveSelectedFile && !!currentTime && !isPlaying
+  );
+  const { data: allDataForFile = [], isLoading: isLoadingAllData } = useAllDataForFile(
+    effectiveSelectedFile, 
+    !!effectiveSelectedFile && isPlaying
+  );
+  const predictionMutation = usePrediction();
+
+  // Derive currentData from dataAtTime instead of storing in state
+  const currentData = dataAtTime && dataAtTime.length > 0 ? dataAtTime[0] : null;
+
+  // Compute message during render instead of using useEffect
+  const message = (() => {
+    if (isLoadingFiles) return 'Loading data files...';
+    if (filesError) return `Error loading data files: ${filesError.message}`;
+    if (isLoadingDataAtTime) return 'Loading data at selected time...';
+    if (dataAtTimeError) return `Error loading data: ${dataAtTimeError.message}`;
+    if (dataAtTime && dataAtTime.length > 0) {
+      return `Loaded synchronized data from ${effectiveSelectedFile} at ${new Date(currentTime).toLocaleString()}`;
+    }
+    if (dataFiles.length > 0) return `Loaded ${dataFiles.length} data files`;
+    return '';
+  })();
+
+  // Trigger prediction function - called by user actions
+  const triggerPrediction = useCallback((sensorData: SensorDataPoint) => {
+    predictionMutation.mutate(sensorData, {
+      onSuccess: (predictionResult) => {
+        setPrediction(predictionResult);
+        onPrediction?.(predictionResult);
+      },
+      onError: (error) => {
+        console.error('Prediction error:', error);
+      }
+    });
+  }, [predictionMutation, onPrediction]);
+
+  // Handle data at time changes - notify parent and trigger prediction for manual selection
   useEffect(() => {
-    loadDataFiles();
-  }, []);
-
-  // Retry loading data files if none are loaded
-  useEffect(() => {
-    if (dataFiles.length === 0) {
-      const timer = setTimeout(() => {
-        console.log('Retrying to load data files...');
-        loadDataFiles();
-      }, 2000);
-      return () => clearTimeout(timer);
+    if (currentData) {
+      onDataSelect?.(currentData);
+      
+      // Trigger prediction for manual time selection (not during playback)
+      if (!isPlaying) {
+        triggerPrediction(currentData);
+      }
     }
-  }, [dataFiles.length]);
-
-
-
-  const loadDataFiles = async () => {
-    try {
-      console.log('Loading data files...');
-      const response = await fetch('/api/replay?action=list-files');
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('Data files response:', data);
-      
-      if (data.success) {
-        setDataFiles(data.files);
-        if (data.files.length > 0) {
-          setSelectedFile(data.files[0].filename);
-        }
-        setMessage(`Loaded ${data.files.length} data files`);
-      } else {
-        setMessage(`Error: ${data.error || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('Error loading data files:', error);
-      setMessage(`Error loading data files: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
-
-  const loadAllDataForFile = async (filename: string) => {
-    try {
-      console.log(`Loading all data for ${filename}...`);
-      const response = await fetch(`/api/replay?action=get-data&filename=${filename}`);
-      const data = await response.json();
-      
-      if (data.success && data.data.data) {
-        allDataRef.current = data.data.data;
-        currentIndexRef.current = 0;
-        console.log(`Loaded ${allDataRef.current.length} data points for playback`);
-        
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Error loading all data:', error);
-      return false;
-    }
-  };
-
-  const loadDataAtTime = async (time: string) => {
-    if (!selectedFile || !time) return;
-
-    try {
-      // Validate the time format
-      const targetTime = new Date(time);
-      if (isNaN(targetTime.getTime())) {
-        setMessage('Invalid time format. Please select a valid date and time.');
-        return;
-      }
-
-      // Load sensor data
-      const response = await fetch(
-        `/api/replay?action=get-data&filename=${selectedFile}&time=${time}`
-      );
-      const data = await response.json();
-      
-      if (data.success && data.data.data.length > 0) {
-        const sensorData = data.data.data[0]; // Get the closest data point
-        
-        // Load ML prediction in parallel
-        const predictionPromise = predictOccupancy(sensorData);
-        
-        // Wait for both to complete
-        await Promise.all([Promise.resolve(), predictionPromise]);
-        
-        // Update UI with both sensor data and prediction simultaneously
-        setCurrentData(sensorData);
-        onDataSelect?.(sensorData);
-        setMessage(`Loaded synchronized data from ${selectedFile} at ${new Date(time).toLocaleString()}`);
-      } else {
-        setMessage('No data found at selected time');
-      }
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setMessage('Error loading data');
-    }
-  };
-
-
-  const predictOccupancy = async (dataPoint: SensorDataPoint) => {
-    if (!dataPoint) return;
-
-    try {
-      // Prepare the request data for ML API (excluding the actual occupancy value)
-      const requestData = {
-        date: dataPoint.date,
-        Temperature: dataPoint.Temperature,
-        Humidity: dataPoint.Humidity,
-        Light: dataPoint.Light,
-        CO2: dataPoint.CO2,
-        HumidityRatio: dataPoint.HumidityRatio
-      };
-
-      const response = await fetch('/api/ml/predict', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData)
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const predictionResult = await response.json();
-      
-      if (predictionResult.occupancy !== undefined && predictionResult.probability !== undefined) {
-        const prediction = {
-          occupancy: predictionResult.occupancy,
-          probability: predictionResult.probability
-        };
-        setPrediction(prediction);
-        onPrediction?.(prediction);
-        return prediction; // Return prediction for synchronization
-      } else {
-        throw new Error('Invalid prediction response from ML API');
-      }
-    } catch (error) {
-      console.error('Error predicting occupancy:', error);
-      throw error; // Re-throw for proper error handling in calling function
-    }
-  };
+  }, [currentData, isPlaying, onDataSelect, triggerPrediction]);
 
   const startPlayback = async () => {
-    if (!selectedFile) return;
-
-    // Load all data for the selected file if not already loaded
-    if (allDataRef.current.length === 0) {
-      const loaded = await loadAllDataForFile(selectedFile);
-      if (!loaded) {
-        setMessage('Failed to load data for playback');
-        return;
-      }
-    }
-
-    if (allDataRef.current.length === 0) {
-      setMessage('No data available for playback');
+    if (!effectiveSelectedFile || allDataForFile.length === 0) {
       return;
     }
 
     setIsPlaying(true);
-    setMessage(`Starting playback at ${playbackSpeed}x speed`);
 
     // Start from current time or beginning
     let startIndex = currentIndexRef.current;
     if (currentTime) {
       const targetTime = new Date(currentTime);
-      startIndex = allDataRef.current.findIndex(point => 
+      startIndex = allDataForFile.findIndex(point => 
         new Date(point.date) >= targetTime
       );
       if (startIndex === -1) startIndex = 0;
@@ -231,29 +111,23 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
     currentIndexRef.current = startIndex;
 
     intervalRef.current = setInterval(async () => {
-      if (currentIndexRef.current >= allDataRef.current.length) {
+      if (currentIndexRef.current >= allDataForFile.length) {
         stopPlayback();
-        setMessage('Playback completed');
         return;
       }
 
-      const dataPoint = allDataRef.current[currentIndexRef.current];
-      
+      const dataPoint = allDataForFile[currentIndexRef.current];
       
       try {
-        // Load ML prediction
-        await predictOccupancy(dataPoint);
-        
-        // Update UI with both sensor data and prediction simultaneously
-        setCurrentData(dataPoint);
+        // Update time for UI
         setCurrentTime(dataPoint.date);
-        onDataSelect?.(dataPoint);
+        
+        // Load ML prediction during playback (user action)
+        triggerPrediction(dataPoint);
       } catch (error) {
         console.error('Error during playback:', error);
-        // Still show sensor data even if prediction fails
-        setCurrentData(dataPoint);
+        // Still update time even if prediction fails
         setCurrentTime(dataPoint.date);
-        onDataSelect?.(dataPoint);
       }
 
       currentIndexRef.current++;
@@ -266,24 +140,19 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
       intervalRef.current = null;
     }
     setIsPlaying(false);
-    setMessage('Playback stopped');
   };
 
   const handleTimeChange = (time: string) => {
     setCurrentTime(time);
-    if (time) {
-      loadDataAtTime(time);
-    }
+    // React Query will automatically fetch data when currentTime changes
+    // Prediction will be triggered when dataAtTime updates (if not playing)
   };
 
   const handleFileChange = async (filename: string) => {
     setSelectedFile(filename);
     setCurrentTime('');
-    setCurrentData(null);
+    setPrediction(null);
     stopPlayback();
-    
-    // Clear cached data when switching files
-    allDataRef.current = [];
     currentIndexRef.current = 0;
   };
 
@@ -297,7 +166,7 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
     };
   }, []);
 
-  const selectedFileData = dataFiles.find(f => f.filename === selectedFile);
+  const selectedFileData = dataFiles.find(f => f.filename === effectiveSelectedFile);
   const timeRange = selectedFileData?.timeRange;
 
   return (
@@ -318,11 +187,14 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                   Select Data File
                 </label>
                 <select
-                  value={selectedFile}
+                  value={effectiveSelectedFile}
                   onChange={(e) => handleFileChange(e.target.value)}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm"
+                  disabled={isLoadingFiles}
                 >
-                  <option value="">Choose a file...</option>
+                  <option value="">
+                    {isLoadingFiles ? 'Loading files...' : 'Choose a file...'}
+                  </option>
                   {dataFiles.map((file) => (
                     <option key={file.filename} value={file.filename}>
                       {file.filename} ({file.totalRecords} records)
@@ -344,7 +216,7 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
             </div>
 
             {/* Time Controls Card */}
-            {selectedFile && timeRange && (
+            {effectiveSelectedFile && timeRange && (
               <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
                 <div className="flex items-center gap-2 mb-4">
                   <Clock className="h-5 w-5 text-green-600" />
@@ -371,7 +243,14 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                       min={timeRange.start ? new Date(timeRange.start).toISOString().slice(0, 16) : ''}
                       max={timeRange.end ? new Date(timeRange.end).toISOString().slice(0, 16) : ''}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm"
+                      disabled={isLoadingDataAtTime}
                     />
+                    {isLoadingDataAtTime && (
+                      <div className="flex items-center gap-2 text-sm text-blue-600 mt-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Loading data...
+                      </div>
+                    )}
                   </div>
                   
                   <div className="flex gap-2">
@@ -379,7 +258,6 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                       onClick={() => {
                         const startTime = new Date(timeRange.start);
                         setCurrentTime(startTime.toISOString());
-                        loadDataAtTime(startTime.toISOString());
                       }}
                       className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                     >
@@ -390,7 +268,6 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                       onClick={() => {
                         const endTime = new Date(timeRange.end);
                         setCurrentTime(endTime.toISOString());
-                        loadDataAtTime(endTime.toISOString());
                       }}
                       className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
                     >
@@ -403,7 +280,7 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
             )}
 
             {/* Playback Controls Card */}
-            {selectedFile && (
+            {effectiveSelectedFile && (
               <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
                 <div className="flex items-center gap-2 mb-4">
                   <Play className="h-5 w-5 text-purple-600" />
@@ -415,13 +292,21 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                   <div className="flex justify-center">
                     <button
                       onClick={isPlaying ? stopPlayback : startPlayback}
+                      disabled={isLoadingAllData}
                       className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium text-white transition-colors ${
                         isPlaying 
                           ? 'bg-red-500 hover:bg-red-600' 
+                          : isLoadingAllData
+                          ? 'bg-gray-400 cursor-not-allowed'
                           : 'bg-green-500 hover:bg-green-600'
                       }`}
                     >
-                      {isPlaying ? (
+                      {isLoadingAllData ? (
+                        <>
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          Loading Data...
+                        </>
+                      ) : isPlaying ? (
                         <>
                           <Pause className="h-5 w-5" />
                           Stop Playback
@@ -459,12 +344,12 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                     <div className="bg-gray-50 p-3 rounded-lg">
                       <div className="flex justify-between text-sm text-gray-600 mb-2">
                         <span>Progress</span>
-                        <span>{currentIndexRef.current + 1} / {allDataRef.current.length}</span>
+                        <span>{currentIndexRef.current + 1} / {allDataForFile.length}</span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div 
                           className="bg-blue-500 h-2 rounded-full"
-                          style={{ width: `${((currentIndexRef.current + 1) / allDataRef.current.length) * 100}%` }}
+                          style={{ width: `${((currentIndexRef.current + 1) / allDataForFile.length) * 100}%` }}
                         />
                       </div>
                     </div>
@@ -572,58 +457,70 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
               )}
 
             {/* Prediction Display */}
-            {prediction && (
+            {(prediction || predictionMutation.isPending) && (
               <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
                   <div className="flex items-center gap-2 mb-4">
                     <TrendingUp className="h-6 w-6 text-purple-600" />
                     <h3 className="text-xl font-semibold text-gray-900">ML Prediction</h3>
+                    {predictionMutation.isPending && (
+                      <Loader2 className="h-5 w-5 animate-spin text-purple-600" />
+                    )}
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className={`p-4 rounded-lg border-2 ${
-                        prediction.occupancy === 1 
-                          ? 'bg-red-50 border-red-300' 
-                          : 'bg-emerald-50 border-emerald-300'
-                      }`}>
-                      <div className="flex items-center gap-3">
-                        {prediction.occupancy === 1 ? (
-                          <AlertCircle className="h-8 w-8 text-red-600" />
-                        ) : (
-                          <CheckCircle className="h-8 w-8 text-emerald-600" />
-                        )}
-                        <div className="flex-1 min-h-[60px] flex flex-col justify-center">
-                          <div className={`text-sm font-medium ${
-                            prediction.occupancy === 1 ? 'text-red-700' : 'text-emerald-700'
-                          }`}>
-                            Predicted Occupancy
-                          </div>
-                          <div className={`text-2xl font-bold ${
-                            prediction.occupancy === 1 ? 'text-red-900' : 'text-emerald-900'
-                          }`}>
-                            {prediction.occupancy === 1 ? 'Occupied' : 'Vacant'}
+                  {predictionMutation.isPending ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="flex items-center gap-3 text-purple-600">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span className="text-lg font-medium">Generating prediction...</span>
+                      </div>
+                    </div>
+                  ) : prediction ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className={`p-4 rounded-lg border-2 ${
+                          prediction.occupancy === 1 
+                            ? 'bg-red-50 border-red-300' 
+                            : 'bg-emerald-50 border-emerald-300'
+                        }`}>
+                        <div className="flex items-center gap-3">
+                          {prediction.occupancy === 1 ? (
+                            <AlertCircle className="h-8 w-8 text-red-600" />
+                          ) : (
+                            <CheckCircle className="h-8 w-8 text-emerald-600" />
+                          )}
+                          <div className="flex-1 min-h-[60px] flex flex-col justify-center">
+                            <div className={`text-sm font-medium ${
+                              prediction.occupancy === 1 ? 'text-red-700' : 'text-emerald-700'
+                            }`}>
+                              Predicted Occupancy
+                            </div>
+                            <div className={`text-2xl font-bold ${
+                              prediction.occupancy === 1 ? 'text-red-900' : 'text-emerald-900'
+                            }`}>
+                              {prediction.occupancy === 1 ? 'Occupied' : 'Vacant'}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                      <div className="flex items-center gap-3">
-                        <Activity className="h-8 w-8 text-purple-600" />
-                        <div className="flex-1 min-h-[60px] flex flex-col justify-center">
-                          <div className="text-sm text-purple-700 font-medium">Confidence</div>
-                          <div className="text-2xl font-bold text-purple-900">
-                            {(prediction.probability * 100).toFixed(3)}%
+                      <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                        <div className="flex items-center gap-3">
+                          <Activity className="h-8 w-8 text-purple-600" />
+                          <div className="flex-1 min-h-[60px] flex flex-col justify-center">
+                            <div className="text-sm text-purple-700 font-medium">Confidence</div>
+                            <div className="text-2xl font-bold text-purple-900">
+                              {(prediction.probability * 100).toFixed(3)}%
+                            </div>
                           </div>
                         </div>
-                      </div>
-                      <div className="mt-2 w-full bg-purple-200 rounded-full h-2">
-                        <div 
-                          className="bg-purple-500 h-2 rounded-full"
-                          style={{ width: `${prediction.probability * 100}%` }}
-                        />
+                        <div className="mt-2 w-full bg-purple-200 rounded-full h-2">
+                          <div 
+                            className="bg-purple-500 h-2 rounded-full"
+                            style={{ width: `${prediction.probability * 100}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ) : null}
                 </div>
               )}
 

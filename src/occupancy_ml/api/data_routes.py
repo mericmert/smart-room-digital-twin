@@ -14,21 +14,26 @@ DATA_DIR = PROJECT_ROOT / "data"
 @router.get("/data/{filename}")
 async def get_data_file(filename: str):
     """Serve sensor data files."""
-    # Security check - only allow specific files
-    allowed_files = ["datatest.txt", "datatest2.txt", "datatraining.txt"]
-    
-    if filename not in allowed_files:
-        raise HTTPException(status_code=404, detail="File not found")
-    
     file_path = DATA_DIR / filename
     
-    if not file_path.exists():
+    # Security check - ensure file is in data directory and has allowed extension
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Only allow .txt and .csv files
+    if not (filename.endswith('.txt') or filename.endswith('.csv')):
+        raise HTTPException(status_code=404, detail="File type not allowed")
+    
+    # Ensure the file is within the data directory (path traversal protection)
+    try:
+        file_path.resolve().relative_to(DATA_DIR.resolve())
+    except ValueError:
         raise HTTPException(status_code=404, detail="File not found")
     
     return FileResponse(
         path=str(file_path),
         filename=filename,
-        media_type="text/plain"
+        media_type="text/plain" if filename.endswith('.txt') else "text/csv"
     )
 
 @router.get("/data/list")
@@ -36,12 +41,12 @@ async def list_data_files():
     """List available data files."""
     files = []
     
-    for filename in ["datatest.txt", "datatest2.txt", "datatraining.txt"]:
-        file_path = DATA_DIR / filename
-        if file_path.exists():
+    # Get all .txt and .csv files from the data directory
+    for file_path in DATA_DIR.iterdir():
+        if file_path.is_file() and (file_path.suffix in ['.txt', '.csv']):
             stat = file_path.stat()
             files.append({
-                "filename": filename,
+                "filename": file_path.name,
                 "size": stat.st_size,
                 "modified": stat.st_mtime
             })

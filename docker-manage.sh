@@ -49,12 +49,20 @@ show_usage() {
     echo "  test        Run tests"
     echo ""
     echo "OPTIONS:"
-    echo "  -e, --env ENV     Environment (development|production) [default: development]"
+    echo "  -e, --env ENV     Environment (development|production|local-dev|testing|full) [default: development]"
     echo "  -s, --services    Specific services to target"
     echo "  -h, --help        Show this help"
     echo ""
+    echo "ENVIRONMENTS:"
+    echo "  development  Full development stack in Docker (Kafka + ML API + Next.js)"
+    echo "  production   Full production stack in Docker (Kafka + ML API + Next.js)"
+    echo "  local-dev    Kafka only (for local development with ML API and Next.js running locally)"
+    echo "  testing      Kafka + test utilities"
+    echo "  full         All services (development + production)"
+    echo ""
     echo "EXAMPLES:"
     echo "  $0 up -e development"
+    echo "  $0 up -e local-dev"
     echo "  $0 logs -s occupancy-api"
     echo "  $0 build -e production"
 }
@@ -87,18 +95,26 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate environment
-if [[ "$ENVIRONMENT" != "development" && "$ENVIRONMENT" != "production" ]]; then
+if [[ "$ENVIRONMENT" != "development" && "$ENVIRONMENT" != "production" && "$ENVIRONMENT" != "local-dev" && "$ENVIRONMENT" != "testing" && "$ENVIRONMENT" != "full" ]]; then
     print_error "Invalid environment: $ENVIRONMENT"
-    print_error "Valid environments: development, production"
+    print_error "Valid environments: development, production, local-dev, testing, full"
     exit 1
 fi
 
-# Set compose files based on environment
+# Set compose files and profiles based on environment
 COMPOSE_FILES="-f docker-compose.yaml"
 if [[ "$ENVIRONMENT" == "development" ]]; then
-    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.override.yml"
+    COMPOSE_PROFILE="--profile development"
 elif [[ "$ENVIRONMENT" == "production" ]]; then
-    COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.prod.yml"
+    COMPOSE_PROFILE="--profile production"
+elif [[ "$ENVIRONMENT" == "local-dev" ]]; then
+    COMPOSE_PROFILE="--profile local-dev"
+elif [[ "$ENVIRONMENT" == "testing" ]]; then
+    COMPOSE_PROFILE="--profile testing"
+elif [[ "$ENVIRONMENT" == "full" ]]; then
+    COMPOSE_PROFILE="--profile full"
+else
+    COMPOSE_PROFILE=""
 fi
 
 # Function to run docker-compose commands
@@ -107,9 +123,9 @@ run_compose() {
     local args="$2"
     
     if [[ -n "$SERVICES" ]]; then
-        docker-compose $COMPOSE_FILES $cmd $SERVICES $args
+        docker-compose $COMPOSE_FILES $COMPOSE_PROFILE $cmd $SERVICES $args
     else
-        docker-compose $COMPOSE_FILES $cmd $args
+        docker-compose $COMPOSE_FILES $COMPOSE_PROFILE $cmd $args
     fi
 }
 

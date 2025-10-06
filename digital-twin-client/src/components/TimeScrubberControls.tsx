@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   Play, 
   Pause, 
@@ -28,52 +28,53 @@ interface DataFile {
   };
 }
 
+interface PlaybackState {
+  isPlaying: boolean;
+  speed: number;
+  currentIndex: number;
+  totalRecords: number;
+}
+
+interface MessageState {
+  text: string;
+  type: 'success' | 'error' | 'info' | 'stopped';
+}
+
 export default function TimeScrubberControls({ onDataSelect, onPrediction }: TimeScrubberControlsProps) {
   const [dataFiles, setDataFiles] = useState<DataFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [currentTime, setCurrentTime] = useState<string>('');
   const [currentData, setCurrentData] = useState<SensorDataPoint | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState<'success' | 'error' | 'info' | 'stopped'>('info');
+  const [playbackState, setPlaybackState] = useState<PlaybackState>({
+    isPlaying: false,
+    speed: 1,
+    currentIndex: 0,
+    totalRecords: 0
+  });
+  const [message, setMessage] = useState<MessageState>({ text: '', type: 'info' });
   const [prediction, setPrediction] = useState<{ occupancy: number; probability: number } | null>(null);
+  
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const allDataRef = useRef<SensorDataPoint[]>([]);
-  const currentIndexRef = useRef<number>(0);
+  const playbackStateRef = useRef<PlaybackState>(playbackState);
 
-  // Helper function to convert time to datetime-local format
-  const toDateTimeLocal = (timeString: string): string => {
-    if (!timeString) return '';
-    try {
-      const date = new Date(timeString);
-      // Get the local timezone offset and adjust
-      const offset = date.getTimezoneOffset() * 60000;
-      const localDate = new Date(date.getTime() - offset);
-      return localDate.toISOString().slice(0, 16);
-    } catch (error) {
-      console.error('Error converting time to datetime-local:', error);
-      return '';
-    }
-  };
-
-  // Load available data files
-  useEffect(() => {
-    loadDataFiles();
+  const toDateTimeLocal = useCallback((timeString: string): string => {
+    return DataParser.toDateTimeLocal(timeString);
   }, []);
 
-  // Retry loading data files if none are loaded
-  useEffect(() => {
-    if (dataFiles.length === 0) {
-      const timer = setTimeout(() => {
-        console.log('Retrying to load data files...');
-        loadDataFiles();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [dataFiles.length]);
+  const updateMessage = useCallback((text: string, type: MessageState['type'] = 'info') => {
+    setMessage({ text, type });
+  }, []);
 
-  const loadDataFiles = async () => {
+  const updatePlaybackState = useCallback((updates: Partial<PlaybackState>) => {
+    setPlaybackState(prev => {
+      const newState = { ...prev, ...updates };
+      playbackStateRef.current = newState;
+      return newState;
+    });
+  }, []);
+
+  const loadDataFiles = useCallback(async () => {
     try {
       console.log('Loading data files...');
       const response = await fetch('/api/replay?action=list-files');
@@ -87,23 +88,33 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
       
       if (data.success) {
         setDataFiles(data.files);
-        if (data.files.length > 0) {
-          setSelectedFile(data.files[0].filename);
-        }
-        setMessage(`Loaded ${data.files.length} data files`);
-        setMessageType('success');
+        updateMessage(`Loaded ${data.files.length} data files`, 'success');
       } else {
-        setMessage(`Error: ${data.error || 'Unknown error'}`);
-        setMessageType('error');
+        updateMessage(`Error: ${data.error || 'Unknown error'}`, 'error');
       }
     } catch (error) {
       console.error('Error loading data files:', error);
-      setMessage(`Error loading data files: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setMessageType('error');
+      updateMessage(`Error loading data files: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
-  };
+  }, [updateMessage]);
 
-  const loadAllDataForFile = async (filename: string) => {
+  // Load data files on mount and retry if needed
+  useEffect(() => {
+    loadDataFiles();
+    
+    // Set up retry mechanism if no files are loaded
+    const retryTimer = setTimeout(() => {
+      if (dataFiles.length === 0) {
+        console.log('Retrying to load data files...');
+        loadDataFiles();
+      }
+    }, 2000);
+
+    return () => clearTimeout(retryTimer);
+  }, [loadDataFiles, dataFiles.length]);
+
+
+  const loadAllDataForFile = useCallback(async (filename: string) => {
     try {
       console.log(`Loading all data for ${filename}...`);
       const response = await fetch(`/api/replay?action=get-data&filename=${filename}`);
@@ -117,7 +128,10 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
       
       if (data.success && data.data.data) {
         allDataRef.current = data.data.data;
-        currentIndexRef.current = 0;
+        updatePlaybackState({ 
+          currentIndex: 0, 
+          totalRecords: data.data.data.length 
+        });
         
         if (allDataRef.current.length > 0) {
           const firstData = allDataRef.current[0];
@@ -126,22 +140,19 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
           onDataSelect?.(firstData);
         }
         
-        setMessage(`Loaded ${allDataRef.current.length} data points from ${filename}`);
-        setMessageType('success');
+        updateMessage(`Loaded ${allDataRef.current.length} data points from ${filename}`, 'success');
       } else {
-        setMessage(`Error: ${data.error || 'Failed to load data'}`);
-        setMessageType('error');
+        updateMessage(`Error: ${data.error || 'Failed to load data'}`, 'error');
       }
     } catch (error) {
       console.error('Error loading data:', error);
-      setMessage(`Error loading data: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setMessageType('error');
+      updateMessage(`Error loading data: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
-  };
+  }, [updateMessage, updatePlaybackState, onDataSelect]);
 
-  const startPlayback = () => {
+  const startPlayback = useCallback(() => {
     if (allDataRef.current.length === 0) {
-      setMessage('No data loaded. Please select a file first.');
+      updateMessage('No data loaded. Please select a file first.', 'error');
       return;
     }
 
@@ -153,7 +164,7 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
         if (data) {
           const index = allDataRef.current.findIndex(d => d.date === data.date);
           if (index !== -1) {
-            currentIndexRef.current = index;
+            updatePlaybackState({ currentIndex: index });
           }
         }
       } catch (error) {
@@ -163,20 +174,21 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
     }
 
     // Immediately show the data for the start time
-    const startData = allDataRef.current[currentIndexRef.current];
+    const startData = allDataRef.current[playbackState.currentIndex];
     setCurrentData(startData);
     setCurrentTime(startData.date);
     onDataSelect?.(startData);
     getPrediction(startData);
 
-    setIsPlaying(true);
-    setMessage(`Playback started from ${new Date(allDataRef.current[currentIndexRef.current].date).toLocaleString()}`);
-    setMessageType('info');
+    updatePlaybackState({ isPlaying: true });
+    updateMessage(`Playback started from ${new Date(startData.date).toLocaleString()}`, 'info');
 
     const interval = setInterval(() => {
-      if (currentIndexRef.current < allDataRef.current.length - 1) {
-        currentIndexRef.current += 1;
-        const data = allDataRef.current[currentIndexRef.current];
+      const currentState = playbackStateRef.current;
+      if (currentState.currentIndex < allDataRef.current.length - 1) {
+        const newIndex = currentState.currentIndex + 1;
+        updatePlaybackState({ currentIndex: newIndex });
+        const data = allDataRef.current[newIndex];
         setCurrentData(data);
         setCurrentTime(data.date);
         onDataSelect?.(data);
@@ -186,30 +198,29 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
       } else {
         stopPlayback();
       }
-    }, 1000 / playbackSpeed);
+    }, 1000 / playbackStateRef.current.speed);
 
     intervalRef.current = interval;
-  };
+  }, [currentTime, playbackState.currentIndex, playbackState.speed, updateMessage, updatePlaybackState, onDataSelect]);
 
-  const stopPlayback = () => {
+  const stopPlayback = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    setIsPlaying(false);
-    setMessage('Playback stopped');
-    setMessageType('stopped');
-  };
+    updatePlaybackState({ isPlaying: false });
+    updateMessage('Playback stopped', 'stopped');
+  }, [updateMessage, updatePlaybackState]);
 
-  const stopPlaybackSilently = () => {
+  const stopPlaybackSilently = useCallback(() => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    setIsPlaying(false);
-  };
+    updatePlaybackState({ isPlaying: false });
+  }, [updatePlaybackState]);
 
-  const getPrediction = async (data: SensorDataPoint) => {
+  const getPrediction = useCallback(async (data: SensorDataPoint) => {
     try {
       const response = await fetch('/api/ml/predict', {
         method: 'POST',
@@ -245,25 +256,24 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
     } catch (error) {
       console.error('Error getting prediction:', error);
     }
-  };
+  }, [onPrediction]);
 
-  const handleFileChange = (filename: string) => {
+  const handleFileChange = useCallback((filename: string) => {
     setSelectedFile(filename);
     loadAllDataForFile(filename);
     stopPlaybackSilently();
-  };
+  }, [loadAllDataForFile, stopPlaybackSilently]);
 
-  const handleTimeChange = (time: string) => {
+  const handleTimeChange = useCallback((time: string) => {
     setCurrentTime(time);
     if (time && allDataRef.current.length > 0) {
       try {
-        // Convert the datetime-local input to a proper Date object
-        const targetTime = new Date(time);
+        // Parse the datetime-local input using our robust date parser
+        const targetTime = DataParser.parseDate(time);
         
         // Validate the date
-        if (isNaN(targetTime.getTime())) {
-          setMessage('Invalid time format. Please select a valid date and time.');
-          setMessageType('error');
+        if (!targetTime) {
+          updateMessage('Invalid time format. Please select a valid date and time.', 'error');
           return;
         }
         
@@ -276,67 +286,67 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
           // Update the current index to match the found data
           const index = allDataRef.current.findIndex(d => d.date === data.date);
           if (index !== -1) {
-            currentIndexRef.current = index;
+            updatePlaybackState({ currentIndex: index });
           }
-          setMessage(`Time updated to ${new Date(data.date).toLocaleString()}`);
-          setMessageType('info');
+          updateMessage(`Time updated to ${targetTime.toLocaleString()}`, 'info');
         } else {
-          setMessage('No data found for the selected time. Please try a different time.');
-          setMessageType('error');
+          updateMessage('No data found for the selected time. Please try a different time.', 'error');
         }
       } catch (error) {
         console.error('Error handling time change:', error);
-        setMessage('Error processing time selection. Please try again.');
-        setMessageType('error');
+        updateMessage('Error processing time selection. Please try again.', 'error');
       }
     }
-  };
+  }, [updateMessage, updatePlaybackState, onDataSelect, getPrediction]);
 
-  const skipToStart = () => {
+  const skipToStart = useCallback(() => {
     if (allDataRef.current.length > 0) {
-      currentIndexRef.current = 0;
+      updatePlaybackState({ currentIndex: 0 });
       const data = allDataRef.current[0];
       setCurrentData(data);
       setCurrentTime(data.date);
       onDataSelect?.(data);
       getPrediction(data);
     }
-  };
+  }, [updatePlaybackState, onDataSelect, getPrediction]);
 
-  const skipToEnd = () => {
+  const skipToEnd = useCallback(() => {
     if (allDataRef.current.length > 0) {
-      currentIndexRef.current = allDataRef.current.length - 1;
-      const data = allDataRef.current[currentIndexRef.current];
+      const lastIndex = allDataRef.current.length - 1;
+      updatePlaybackState({ currentIndex: lastIndex });
+      const data = allDataRef.current[lastIndex];
       setCurrentData(data);
       setCurrentTime(data.date);
       onDataSelect?.(data);
       getPrediction(data);
     }
-  };
+  }, [updatePlaybackState, onDataSelect, getPrediction]);
 
-  const stepBackward = () => {
-    if (currentIndexRef.current > 0) {
-      currentIndexRef.current -= 1;
-      const data = allDataRef.current[currentIndexRef.current];
+  const stepBackward = useCallback(() => {
+    if (playbackState.currentIndex > 0) {
+      const newIndex = playbackState.currentIndex - 1;
+      updatePlaybackState({ currentIndex: newIndex });
+      const data = allDataRef.current[newIndex];
       setCurrentData(data);
       setCurrentTime(data.date);
       onDataSelect?.(data);
       getPrediction(data);
     }
-  };
+  }, [playbackState.currentIndex, updatePlaybackState, onDataSelect, getPrediction]);
 
-  const stepForward = () => {
-    if (currentIndexRef.current < allDataRef.current.length - 1) {
-      currentIndexRef.current += 1;
-      const data = allDataRef.current[currentIndexRef.current];
+  const stepForward = useCallback(() => {
+    if (playbackState.currentIndex < allDataRef.current.length - 1) {
+      const newIndex = playbackState.currentIndex + 1;
+      updatePlaybackState({ currentIndex: newIndex });
+      const data = allDataRef.current[newIndex];
       setCurrentData(data);
       setCurrentTime(data.date);
       onDataSelect?.(data);
       getPrediction(data);
     }
-  };
+  }, [playbackState.currentIndex, updatePlaybackState, onDataSelect, getPrediction]);
 
-  const adjustTime = (milliseconds: number) => {
+  const adjustTime = useCallback((milliseconds: number) => {
     if (currentTime && allDataRef.current.length > 0) {
       try {
         const currentDate = new Date(currentTime);
@@ -344,11 +354,15 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
         handleTimeChange(newTime.toISOString());
       } catch (error) {
         console.error('Error adjusting time:', error);
-        setMessage('Error adjusting time. Please try again.');
-        setMessageType('error');
+        updateMessage('Error adjusting time. Please try again.', 'error');
       }
     }
-  };
+  }, [currentTime, handleTimeChange, updateMessage]);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    playbackStateRef.current = playbackState;
+  }, [playbackState]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -363,7 +377,7 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
     <div className="card p-4">
       <div className="flex items-center gap-2 mb-4">
         <Clock className="h-5 w-5 text-blue-600" />
-        <h2 className="heading-3">Timeline</h2>
+        <h2 className="heading-3">Digital Twin - Smart Office Room</h2>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -373,11 +387,16 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
             Data File
           </label>
           <select
-            value={selectedFile}
+            value={selectedFile || ''}
             onChange={(e) => handleFileChange(e.target.value)}
             className="input w-full"
+            disabled={dataFiles.length === 0}
           >
-            <option value="">Select file...</option>
+            {!selectedFile && (
+              <option value="" disabled>
+                {dataFiles.length === 0 ? 'Loading files...' : 'Select file...'}
+              </option>
+            )}
             {dataFiles.map((file) => (
               <option key={file.filename} value={file.filename}>
                 {file.filename} ({file.totalRecords})
@@ -398,7 +417,7 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
                 value={toDateTimeLocal(currentTime)}
                 onChange={(e) => {
                   if (e.target.value) {
-                    // Convert datetime-local format (YYYY-MM-DDTHH:MM) to ISO string
+                    // Convert datetime-local format (YYYY-MM-DDTHH:MM:SS) to ISO string
                     const localDateTime = new Date(e.target.value);
                     handleTimeChange(localDateTime.toISOString());
                   } else {
@@ -413,7 +432,7 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
                 <button
                   onClick={() => adjustTime(-60 * 60 * 1000)} // -1 hour
                   className="button button-secondary text-xs py-1"
-                  disabled={isPlaying}
+                  disabled={playbackState.isPlaying}
                   title="Go back 1 hour"
                 >
                   -1h
@@ -421,7 +440,7 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
                 <button
                   onClick={() => adjustTime(-15 * 60 * 1000)} // -15 minutes
                   className="button button-secondary text-xs py-1"
-                  disabled={isPlaying}
+                  disabled={playbackState.isPlaying}
                   title="Go back 15 minutes"
                 >
                   -15m
@@ -429,7 +448,7 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
                 <button
                   onClick={() => adjustTime(15 * 60 * 1000)} // +15 minutes
                   className="button button-secondary text-xs py-1"
-                  disabled={isPlaying}
+                  disabled={playbackState.isPlaying}
                   title="Go forward 15 minutes"
                 >
                   +15m
@@ -437,7 +456,7 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
                 <button
                   onClick={() => adjustTime(60 * 60 * 1000)} // +1 hour
                   className="button button-secondary text-xs py-1"
-                  disabled={isPlaying}
+                  disabled={playbackState.isPlaying}
                   title="Go forward 1 hour"
                 >
                   +1h
@@ -454,10 +473,10 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
               Speed
             </label>
             <select
-              value={playbackSpeed}
-              onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
+              value={playbackState.speed}
+              onChange={(e) => updatePlaybackState({ speed: Number(e.target.value) })}
               className="input w-full"
-              disabled={isPlaying}
+              disabled={playbackState.isPlaying}
             >
               <option value={0.5}>0.5x</option>
               <option value={1}>1x</option>
@@ -477,7 +496,7 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
             <button
               onClick={skipToStart}
               className="button button-secondary p-2"
-              disabled={isPlaying}
+              disabled={playbackState.isPlaying}
               title="Skip to start"
             >
               <RotateCcw className="h-4 w-4" />
@@ -486,21 +505,21 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
             <button
               onClick={stepBackward}
               className="button button-secondary p-2"
-              disabled={isPlaying}
+              disabled={playbackState.isPlaying}
               title="Step backward"
             >
               <SkipBack className="h-4 w-4" />
             </button>
 
             <button
-              onClick={isPlaying ? stopPlayback : startPlayback}
+              onClick={playbackState.isPlaying ? stopPlayback : startPlayback}
               className={`flex items-center gap-1 px-4 py-2 rounded-lg font-medium text-white transition-colors ${
-                isPlaying 
-                  ? 'bg-red-500 hover:bg-red-600' 
-                  : 'bg-green-500 hover:bg-green-600'
+                playbackState.isPlaying 
+                  ? 'bg-error hover:bg-error-light' 
+                  : 'bg-success hover:bg-success-light'
               }`}
             >
-              {isPlaying ? (
+              {playbackState.isPlaying ? (
                 <>
                   <Pause className="h-4 w-4" />
                   <span className="text-sm">Stop</span>
@@ -516,7 +535,7 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
             <button
               onClick={stepForward}
               className="button button-secondary p-2"
-              disabled={isPlaying}
+              disabled={playbackState.isPlaying}
               title="Step forward"
             >
               <SkipForward className="h-4 w-4" />
@@ -525,7 +544,7 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
             <button
               onClick={skipToEnd}
               className="button button-secondary p-2"
-              disabled={isPlaying}
+              disabled={playbackState.isPlaying}
               title="Skip to end"
             >
               <RotateCw className="h-4 w-4" />
@@ -533,16 +552,16 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
           </div>
 
           {/* Progress Indicator */}
-          {isPlaying && (
-            <div className="bg-secondary p-2 rounded-md">
-              <div className="flex justify-between text-xs text-secondary mb-1">
+          {playbackState.isPlaying && (
+            <div className="bg-secondary p-3 rounded-md">
+              <div className="flex justify-between text-sm text-secondary mb-2">
                 <span>Progress</span>
-                <span>{currentIndexRef.current + 1} / {allDataRef.current.length}</span>
+                <span>{playbackState.currentIndex + 1} / {playbackState.totalRecords}</span>
               </div>
-              <div className="w-full bg-tertiary rounded-full h-1.5">
+              <div className="w-full bg-tertiary rounded-full h-3">
                 <div 
-                  className="bg-primary h-1.5 rounded-full"
-                  style={{ width: `${((currentIndexRef.current + 1) / allDataRef.current.length) * 100}%` }}
+                  className="bg-success h-3 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${((playbackState.currentIndex + 1) / playbackState.totalRecords) * 100}%` }}
                 />
               </div>
             </div>
@@ -551,27 +570,27 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
       )}
 
       {/* Status Message */}
-      {message && (
+      {message.text && (
         <div className={`mt-3 p-2 rounded-md border ${
-          messageType === 'error' 
+          message.type === 'error' 
             ? 'text-error border-error'
-            : messageType === 'stopped'
+            : message.type === 'stopped'
             ? 'text-warning border-warning'
-            : messageType === 'success'
+            : message.type === 'success'
             ? 'text-success border-success'
             : 'text-info border-info'
         }`}>
           <div className="flex items-center gap-1">
             <CheckCircle className={`h-4 w-4 ${
-              messageType === 'error' 
+              message.type === 'error' 
                 ? 'text-error' 
-                : messageType === 'stopped'
+                : message.type === 'stopped'
                 ? 'text-warning'
-                : messageType === 'success'
+                : message.type === 'success'
                 ? 'text-success'
                 : 'text-info'
             }`} />
-            <span className="text-sm font-medium">{message}</span>
+            <span className="text-sm font-medium">{message.text}</span>
           </div>
         </div>
       )}

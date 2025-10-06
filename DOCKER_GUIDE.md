@@ -188,7 +188,7 @@ docker stats
 ### Debug Mode
 ```bash
 # Start with debug logging
-docker-compose -f docker-compose.yaml -f docker-compose.override.yml up
+docker-compose --profile local-dev up
 
 # Access container shell
 docker-compose exec occupancy-api bash
@@ -235,8 +235,7 @@ docker-compose up --scale occupancy-api=3
 ```
 .
 ├── Dockerfile                 # Multi-stage Docker build
-├── docker-compose.yaml       # Main compose file
-├── docker-compose.override.yml # Development overrides
+├── docker-compose.yaml       # Main configuration with profiles
 ├── docker-compose.prod.yml   # Production overrides
 ├── docker-manage.sh          # Management script
 ├── docker-test.sh            # Testing script

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { SensorDataPoint } from '@/utils/dataParser';
 
@@ -20,15 +20,17 @@ interface MetricVisualization {
 
 export default function OfficeRoom3D({ 
   data, 
-  width = 800, 
-  height = 600 
+  width, 
+  height 
 }: OfficeRoom3DProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const animationRef = useRef<number | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   // Convert sensor data to visualization metrics
   const getMetrics = (data: SensorDataPoint | null): MetricVisualization => {
@@ -116,9 +118,35 @@ export default function OfficeRoom3D({
     }
   };
 
+  // Handle resize
+  const handleResize = useCallback(() => {
+    if (!mountRef.current || !cameraRef.current || !rendererRef.current) return;
+
+    const container = mountRef.current;
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
+
+    // Update dimensions state
+    setDimensions({ width: containerWidth, height: containerHeight });
+
+    // Update camera aspect ratio
+    cameraRef.current.aspect = containerWidth / containerHeight;
+    cameraRef.current.updateProjectionMatrix();
+
+    // Update renderer size
+    rendererRef.current.setSize(containerWidth, containerHeight);
+  }, []);
+
   // Initialize Three.js scene
   const initScene = () => {
     if (!mountRef.current) return;
+
+    const container = mountRef.current;
+    const containerWidth = width || container.clientWidth;
+    const containerHeight = height || container.clientHeight;
+
+    // Update dimensions state
+    setDimensions({ width: containerWidth, height: containerHeight });
 
     // Scene
     const scene = new THREE.Scene();
@@ -126,19 +154,19 @@ export default function OfficeRoom3D({
     sceneRef.current = scene;
 
     // Camera
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+    const camera = new THREE.PerspectiveCamera(75, containerWidth / containerHeight, 0.1, 1000);
     camera.position.set(5, 5, 5);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
     // Renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(width, height);
+    renderer.setSize(containerWidth, containerHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
 
-    mountRef.current.appendChild(renderer.domElement);
+    container.appendChild(renderer.domElement);
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
@@ -252,6 +280,7 @@ export default function OfficeRoom3D({
     if (!sceneRef.current) return;
 
     const scene = sceneRef.current;
+    const roomHeight = 3; // Room height constant
 
     // Update wall colors based on temperature and humidity
     const tempColor = getTemperatureColor(metrics.temperature);
@@ -310,19 +339,74 @@ export default function OfficeRoom3D({
 
     // Add people based on occupancy
     for (let i = 0; i < metrics.occupancy; i++) {
-      const personGeometry = new THREE.CylinderGeometry(0.2, 0.2, 1.7);
-      const personMaterial = new THREE.MeshLambertMaterial({ 
-        color: 0x4169E1 // Royal blue
+      const personGroup = new THREE.Group();
+      
+      // Head
+      const headGeometry = new THREE.SphereGeometry(0.15, 8, 8);
+      const headMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0xFFDBB5 // Skin color
       });
-      const person = new THREE.Mesh(personGeometry, personMaterial);
-      person.position.set(
+      const head = new THREE.Mesh(headGeometry, headMaterial);
+      head.position.y = 1.4;
+      head.castShadow = true;
+      personGroup.add(head);
+      
+      // Torso
+      const torsoGeometry = new THREE.BoxGeometry(0.3, 0.6, 0.2);
+      const torsoMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0x4169E1 // Royal blue shirt
+      });
+      const torso = new THREE.Mesh(torsoGeometry, torsoMaterial);
+      torso.position.y = 0.8;
+      torso.castShadow = true;
+      personGroup.add(torso);
+      
+      // Arms
+      const armGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.5);
+      const armMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0xFFDBB5 // Skin color
+      });
+      
+      // Left arm
+      const leftArm = new THREE.Mesh(armGeometry, armMaterial);
+      leftArm.position.set(-0.25, 0.8, 0);
+      leftArm.rotation.z = Math.PI / 4;
+      leftArm.castShadow = true;
+      personGroup.add(leftArm);
+      
+      // Right arm
+      const rightArm = new THREE.Mesh(armGeometry, armMaterial);
+      rightArm.position.set(0.25, 0.8, 0);
+      rightArm.rotation.z = -Math.PI / 4;
+      rightArm.castShadow = true;
+      personGroup.add(rightArm);
+      
+      // Legs
+      const legGeometry = new THREE.CylinderGeometry(0.06, 0.06, 0.7);
+      const legMaterial = new THREE.MeshLambertMaterial({ 
+        color: 0x2F4F4F // Dark gray pants
+      });
+      
+      // Left leg
+      const leftLeg = new THREE.Mesh(legGeometry, legMaterial);
+      leftLeg.position.set(-0.1, 0.15, 0);
+      leftLeg.castShadow = true;
+      personGroup.add(leftLeg);
+      
+      // Right leg
+      const rightLeg = new THREE.Mesh(legGeometry, legMaterial);
+      rightLeg.position.set(0.1, 0.15, 0);
+      rightLeg.castShadow = true;
+      personGroup.add(rightLeg);
+      
+      // Position the entire person
+      personGroup.position.set(
         -1 + i * 0.8,
-        -0.15,
+        -roomHeight / 2 + 0.35,
         0.5
       );
-      person.castShadow = true;
-      person.userData.type = 'person';
-      scene.add(person);
+      personGroup.userData.type = 'person';
+      scene.add(personGroup);
     }
 
     // Add humidity particles
@@ -405,15 +489,25 @@ export default function OfficeRoom3D({
   // Initialize and cleanup
   useEffect(() => {
     initScene();
+    
+    // Set up resize observer
+    if (mountRef.current && !width && !height) {
+      resizeObserverRef.current = new ResizeObserver(handleResize);
+      resizeObserverRef.current.observe(mountRef.current);
+    }
+    
     return () => {
       if (animationRef.current) {
         cancelAnimationFrame(animationRef.current);
+      }
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
       }
       if (rendererRef.current && mountRef.current) {
         mountRef.current.removeChild(rendererRef.current.domElement);
       }
     };
-  }, []);
+  }, [handleResize, width, height]);
 
   // Start animation loop
   useEffect(() => {
@@ -436,18 +530,18 @@ export default function OfficeRoom3D({
   }, [data, isInitialized]);
 
   return (
-    <div className="w-[800px] h-[600px]">
+    <div className="w-full max-w-6xl mx-auto">
       <div 
         ref={mountRef} 
-        className="w-full h-full rounded-lg"
-        style={{ width, height }}
+        className="w-full aspect-[3/2] min-h-[400px] rounded-lg overflow-hidden"
+        style={width && height ? { width, height } : {}}
       />
       {data && (
         <div className="mt-4 p-4 card">
           <h3 className="heading-3 mb-2">Current Metrics</h3>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-primary rounded-full"></div>
+              <div className="w-3 h-3 bg-foreground rounded-full"></div>
               <span>Occupancy: {data.Occupancy}</span>
             </div>
             <div className="flex items-center space-x-2">
@@ -456,7 +550,7 @@ export default function OfficeRoom3D({
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-light rounded-full"></div>
-              <span>Light: {data.Light.toFixed(0)}</span>
+              <span>Light: {data.Light.toFixed(0)} lux</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-co2 rounded-full"></div>

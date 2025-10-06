@@ -13,7 +13,7 @@ _env_dir = os.environ.get("OCC_MODEL_DIR")
 if _env_dir:
     DEFAULT_ARTIFACT_DIR = Path(_env_dir).expanduser()
 else:
-    DEFAULT_ARTIFACT_DIR = Path(__file__).resolve().parents[2] / "artifacts" / "occ_v1"
+    DEFAULT_ARTIFACT_DIR = Path(__file__).resolve().parents[2] / "artifacts" / "occ_v2"
 
 # Kafka configuration
 KAFKA_BOOTSTRAP_SERVERS = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")

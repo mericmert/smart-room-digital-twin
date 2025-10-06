@@ -4,7 +4,7 @@ import argparse
 from datetime import datetime
 
 import numpy as np
-from .dataio import read_occ
+from .dataio import read_occ, read_occ_with_anomaly_detection
 from .train import temporal_cv_train, save_artifacts, evaluate_on
 from pathlib import Path
 from typing import Tuple
@@ -38,18 +38,49 @@ def cli_train() -> None:
     p.add_argument("--artifact-dir", required=True, type=Path, help="Directory to write artifacts")
     p.add_argument("--n-splits", type=int, default=5)
     p.add_argument("--gap", type=int, default=5)
+    
+    # Anomaly detection arguments (simplified)
+    p.add_argument("--disable-anomaly-detection", action="store_true", 
+                   help="Disable anomaly detection before training (NOT RECOMMENDED)")
+    p.add_argument("--anomaly-handling", choices=["remove", "flag"], 
+                   default="remove", help="How to handle detected anomalies: remove (default) or flag")
+    
     args = p.parse_args()
     
     _configure_logging()
     set_seeds(42)
     
-    df_train = read_occ(
-        args.data,
-        TARGET_COLUMN,
-        TIMESTAMP_COLUMN,
-        expected_columns=EXPECTED_COLUMNS,
-        numeric_features=NUMERIC_FEATURES
-    )
+    # Load data with anomaly detection (enabled by default)
+    if args.disable_anomaly_detection:
+        logger.warning("Anomaly detection DISABLED - this is NOT recommended for production!")
+        logger.info("Loading data without anomaly detection")
+        df_train = read_occ(
+            args.data,
+            TARGET_COLUMN,
+            TIMESTAMP_COLUMN,
+            expected_columns=EXPECTED_COLUMNS,
+            numeric_features=NUMERIC_FEATURES
+        )
+        anomaly_summary = None
+    else:
+        logger.info("Loading data with anomaly detection enabled (default)")
+        df_train, anomaly_summary = read_occ_with_anomaly_detection(
+            args.data,
+            TARGET_COLUMN,
+            TIMESTAMP_COLUMN,
+            expected_columns=EXPECTED_COLUMNS,
+            numeric_features=NUMERIC_FEATURES,
+            anomaly_detection=True,
+            anomaly_method="combined",  # Best method by default
+            anomaly_handling=args.anomaly_handling,
+            anomaly_correction_method="median",  # Sensible default
+            contamination=0.1,  # Conservative default
+            z_threshold=3.0,  # Standard threshold
+            iqr_multiplier=1.5  # Standard multiplier
+        )
+        
+        if anomaly_summary:
+            logger.info(f"Anomaly detection summary: {anomaly_summary}")
     
     logger.info("Fitting model...")
     
@@ -81,6 +112,16 @@ def cli_train() -> None:
         "random_state": 42,
         "selected_threshold": result["selected_threshold"],
         "threshold_selection": result["threshold_info"],
+        
+        # Anomaly detection metadata
+        "anomaly_detection_enabled": not args.disable_anomaly_detection,
+        "anomaly_summary": anomaly_summary,
+        "anomaly_method": "combined" if not args.disable_anomaly_detection else None,
+        "anomaly_handling": args.anomaly_handling if not args.disable_anomaly_detection else None,
+        "anomaly_correction_method": "median" if not args.disable_anomaly_detection else None,
+        "contamination": 0.1 if not args.disable_anomaly_detection else None,
+        "z_threshold": 3.0 if not args.disable_anomaly_detection else None,
+        "iqr_multiplier": 1.5 if not args.disable_anomaly_detection else None,
     }
 
     save_artifacts(args.artifact_dir, result["best_estimator"], result["feature_names"], metadata)

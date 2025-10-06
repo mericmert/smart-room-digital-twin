@@ -1,4 +1,21 @@
+# Digital Twin Project - Docker Compose Configuration
+# 
+# Profiles:
+# - local-dev: Kafka only (for local development with ML API and Next.js running locally)
+# - development: Full development stack in Docker (Kafka + ML API + Next.js)
+# - production: Full production stack in Docker (Kafka + ML API + Next.js)
+# - testing: Kafka + test utilities
+# - full: All services (development + production)
+#
+# Usage:
+# - Local development: docker-compose --profile local-dev up
+# - Development: docker-compose --profile development up
+# - Production: docker-compose --profile production up
+# - Testing: docker-compose --profile testing up
+# - All services: docker-compose --profile full up
+
 services:
+  # Kafka Broker - Available in all profiles
   broker:
     image: apache/kafka:latest
     container_name: broker
@@ -26,8 +43,14 @@ services:
       start_period: 60s
     networks:
       - kafka-network
+    profiles:
+      - local-dev
+      - development
+      - production
+      - testing
+      - full
 
-  # Occupancy ML API Service
+  # Occupancy ML API Service - Production
   occupancy-api:
     build:
       context: .
@@ -39,7 +62,7 @@ services:
       - "9090:9090"  # Metrics port
     environment:
       # Model Configuration
-      - OCC_MODEL_DIR=/app/artifacts/occ_v1
+      - OCC_MODEL_DIR=/app/artifacts/occ_v2
       - MODEL_VALIDATION_ENABLED=true
       - MODEL_RELOAD_ON_ERROR=false
       
@@ -81,8 +104,11 @@ services:
     restart: unless-stopped
     networks:
       - kafka-network
+    profiles:
+      - production
+      - full
 
-  # Development API Service (optional)
+  # Development API Service - Docker-based development
   occupancy-api-dev:
     build:
       context: .
@@ -93,7 +119,7 @@ services:
       - "8001:8000"
     environment:
       # Model Configuration
-      - OCC_MODEL_DIR=/app/artifacts/occ_v1
+      - OCC_MODEL_DIR=/app/artifacts/occ_v2
       - MODEL_VALIDATION_ENABLED=true
       - MODEL_RELOAD_ON_ERROR=true
       
@@ -126,6 +152,7 @@ services:
         condition: service_healthy
     profiles:
       - development
+      - full
     restart: unless-stopped
     networks:
       - kafka-network
@@ -144,6 +171,7 @@ services:
         echo 'Waiting for Kafka to be ready...' &&
         kafka-topics --bootstrap-server broker:9092 --create --topic docker-occupancy-data --partitions 3 --replication-factor 1 --if-not-exists &&
         kafka-topics --bootstrap-server broker:9092 --create --topic dev-occupancy-data --partitions 3 --replication-factor 1 --if-not-exists &&
+        kafka-topics --bootstrap-server broker:9092 --create --topic prod-occupancy-sensor-data --partitions 3 --replication-factor 1 --if-not-exists &&
         echo 'Topics created successfully' &&
         tail -f /dev/null
       "
@@ -152,7 +180,7 @@ services:
     networks:
       - kafka-network
 
-  # Next.js Digital Twin Client
+  # Next.js Digital Twin Client - Production
   digital-twin-client:
     build:
       context: ./digital-twin-client
@@ -197,8 +225,11 @@ services:
     restart: unless-stopped
     networks:
       - kafka-network
+    profiles:
+      - production
+      - full
 
-  # Development Next.js Client (optional)
+  # Development Next.js Client - Docker-based development
   digital-twin-client-dev:
     build:
       context: ./digital-twin-client
@@ -209,8 +240,8 @@ services:
       - "3001:3000"
     environment:
       # ML API Configuration
-      - ML_API_URL=http://occupancy-api:8000
-      - ML_API_WS_URL=ws://occupancy-api:8000
+      - ML_API_URL=http://occupancy-api-dev:8000
+      - ML_API_WS_URL=ws://occupancy-api-dev:8000
       
       # Kafka Configuration
       - KAFKA_BROKER_URL=broker:9092
@@ -218,15 +249,15 @@ services:
       - KAFKA_CLIENT_ID=digital-twin-client-dev
       
       # Next.js Configuration
-      - NEXT_PUBLIC_ML_API_URL=http://localhost:8000
-      - NEXT_PUBLIC_ML_API_WS_URL=ws://localhost:8000/ws
+      - NEXT_PUBLIC_ML_API_URL=http://localhost:8001
+      - NEXT_PUBLIC_ML_API_WS_URL=ws://localhost:8001/ws
       - NEXT_PUBLIC_KAFKA_TOPIC=dev-occupancy-data
       
       # Development Settings
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
     depends_on:
-      occupancy-api:
+      occupancy-api-dev:
         condition: service_healthy
     volumes:
       - ./digital-twin-client:/app:ro
@@ -234,6 +265,7 @@ services:
       - nextjs_next:/app/.next
     profiles:
       - development
+      - full
     restart: unless-stopped
     networks:
       - kafka-network

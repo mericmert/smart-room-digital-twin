@@ -3,22 +3,22 @@ import { DataParser, SensorDataPoint } from '@/utils/dataParser';
 import fs from 'fs';
 import path from 'path';
 
-// In-memory storage for parsed data files
 const dataCache = new Map<string, any>();
 
-// Load data files from local filesystem
 async function loadDataFiles() {
-  if (dataCache.size > 0) return; // Already loaded
+  if (dataCache.size > 0) return;
 
   try {
-    const files = ['datatest.txt', 'datatest2.txt', 'datatraining.txt'];
     const dataDir = path.join(process.cwd(), '..', 'data');
+    
+    const files = fs.readdirSync(dataDir).filter(file => 
+      file.endsWith('.txt') || file.endsWith('.csv')
+    );
     
     for (const filename of files) {
       try {
         const filePath = path.join(dataDir, filename);
         
-        // Check if file exists
         if (fs.existsSync(filePath)) {
           const content = fs.readFileSync(filePath, 'utf-8');
           const parsed = await DataParser.parseDataFile(content, filename);
@@ -36,7 +36,6 @@ async function loadDataFiles() {
   }
 }
 
-// Initialize data loading
 loadDataFiles();
 
 export async function GET(request: NextRequest) {
@@ -48,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Replay API] GET request - action: ${action}, filename: ${filename}, time: ${time}`);
 
-    await loadDataFiles(); // Ensure data is loaded
+    await loadDataFiles();
 
     switch (action) {
       case 'list-files':
@@ -83,7 +82,6 @@ export async function GET(request: NextRequest) {
 
         const fileData = dataCache.get(filename);
         
-        // If no time specified, return all data (for playback)
         if (!time) {
           return NextResponse.json({
             success: true,
@@ -91,7 +89,6 @@ export async function GET(request: NextRequest) {
           });
         }
 
-        // Get data at specific time
         const targetTime = new Date(time);
         const dataAtTime = DataParser.getDataAtTime(fileData.data, targetTime);
         
@@ -148,7 +145,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { action, filename, time, speed = 1 } = body;
 
-    await loadDataFiles(); // Ensure data is loaded
+    await loadDataFiles();
 
     switch (action) {
       case 'send-kafka-message':
@@ -170,10 +167,8 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Format data for Kafka
         const kafkaData = DataParser.formatSensorDataForKafka(dataAtTime);
         
-        // Send to Kafka endpoint
         const kafkaResponse = await fetch(`${request.nextUrl.origin}/api/kafka`, {
           method: 'POST',
           headers: {

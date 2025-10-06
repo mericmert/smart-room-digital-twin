@@ -1,5 +1,3 @@
-'use client';
-
 import { 
   Activity, 
   Thermometer, 
@@ -60,7 +58,7 @@ export default function SensorMetrics({ currentData, prediction }: SensorMetrics
                 <div className="flex items-center gap-2">
                   <Activity className="h-6 w-6 text-info" />
                   <div className="flex-1 min-h-[40px] flex flex-col justify-center">
-                    <div className="text-xs text-info font-medium">Confidence</div>
+                    <div className="text-xs text-info font-medium">Probability</div>
                     <div className="text-lg font-bold text-info">
                       {(prediction.probability * 100).toFixed(1)}%
                     </div>
@@ -80,7 +78,7 @@ export default function SensorMetrics({ currentData, prediction }: SensorMetrics
                 <Activity className="h-6 w-6 text-gray-400" />
                 <div className="flex-1 min-h-[40px] flex flex-col justify-center">
                   <div className="text-xs text-gray-500 font-medium">No Prediction Available</div>
-                  <div className="text-sm text-gray-400">Select data to see ML prediction</div>
+                  <div className="text-sm text-gray-400">Playback to see ML prediction</div>
                 </div>
               </div>
             </div>

@@ -53,9 +53,9 @@ start_dev() {
         exit 1
     fi
     
-    # Start Kafka in Docker
+    # Start Kafka in Docker using local-dev profile
     print_status "Starting Kafka broker in Docker..."
-    docker-compose up -d broker
+    docker-compose --profile local-dev up -d
     
     # Wait for Kafka to be ready
     print_status "Waiting for Kafka to be ready..."
@@ -80,13 +80,26 @@ start_dev() {
     # Start ML API locally
     print_status "Starting ML API locally..."
     if command_exists python3; then
-        python3 run_local.py &
+        # Install the package in development mode if not already installed
+        if ! python3 -c "import occupancy_ml" 2>/dev/null; then
+            print_status "Installing occupancy-ml package in development mode..."
+            pip3 install -e .
+        fi
+        
+        # Check if uvicorn is available
+        if ! command_exists uvicorn; then
+            print_status "Installing uvicorn..."
+            pip3 install uvicorn[standard]
+        fi
+        
+        # Start the ML API using uvicorn
+        uvicorn src.occupancy_ml.api.api:app --host 127.0.0.1 --port 8000 --reload &
         ML_API_PID=$!
         echo $ML_API_PID > .ml_api.pid
         print_success "ML API started with PID: $ML_API_PID"
         
         # Wait a moment for ML API to start
-        sleep 3
+        sleep 5
         
         # Check if ML API is responding
         if curl -s http://localhost:8000/health >/dev/null 2>&1; then
@@ -147,7 +160,7 @@ stop_dev() {
     
     # Stop Docker services
     print_status "Stopping Kafka broker..."
-    docker-compose down
+    docker-compose --profile local-dev down
     
     print_success "Development environment stopped successfully!"
 }
@@ -157,7 +170,7 @@ status_dev() {
     print_status "Development Environment Status:"
     
     # Check Kafka
-    if docker-compose ps broker | grep -q "Up"; then
+    if docker-compose --profile local-dev ps broker | grep -q "Up"; then
         print_success "Kafka: Running (Docker)"
     else
         print_error "Kafka: Not running"
@@ -204,7 +217,7 @@ logs_dev() {
     fi
     
     print_status "Kafka logs:"
-    docker-compose logs broker
+    docker-compose --profile local-dev logs broker
 }
 
 # Main script logic

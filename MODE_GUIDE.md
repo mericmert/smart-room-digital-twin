@@ -2,28 +2,45 @@
 
 This project supports two distinct operational modes:
 
-## 🚀 Development Mode
+## 🚀 Local Development Mode
 - **Kafka**: Runs in Docker container
 - **ML API**: Runs locally on your machine
 - **Next.js**: Runs locally on your machine
 
+## 🛠️ Development Mode
+- **Kafka**: Runs in Docker container
+- **ML API**: Runs in Docker container (development configuration)
+- **Next.js**: Runs in Docker container (development configuration)
+
 ## 🏭 Production Mode
 - **Kafka**: Runs in Docker container
-- **ML API**: Runs in Docker container
-- **Next.js**: Runs in Docker container
+- **ML API**: Runs in Docker container (production configuration)
+- **Next.js**: Runs in Docker container (production configuration)
 
 ## Quick Start
 
-### Development Mode
+### Local Development Mode (Recommended for Development)
 ```bash
-# Start development environment
+# Start local development environment (Kafka in Docker, ML API & Next.js local)
 ./dev-mode.sh start
 
 # Check status
 ./dev-mode.sh status
 
-# Stop development environment
+# Stop local development environment
 ./dev-mode.sh stop
+```
+
+### Development Mode (Full Docker Stack)
+```bash
+# Start development environment (all services in Docker)
+docker-compose --profile development up -d
+
+# Check status
+docker-compose --profile development ps
+
+# Stop development environment
+docker-compose --profile development down
 ```
 
 ### Production Mode
@@ -38,9 +55,21 @@ This project supports two distinct operational modes:
 ./prod-mode.sh stop
 ```
 
+### Other Modes
+```bash
+# Local development (Kafka only)
+docker-compose --profile local-dev up -d
+
+# Testing mode (Kafka + test utilities)
+docker-compose --profile testing up -d
+
+# All services
+docker-compose --profile full up -d
+```
+
 ## Detailed Configuration
 
-### Development Mode
+### Local Development Mode (Recommended)
 
 #### Prerequisites
 - Docker installed and running
@@ -56,29 +85,13 @@ This project supports two distinct operational modes:
 - Main project: `env.development`
 - Next.js client: `digital-twin-client/env.development`
 
-#### Starting Development Mode
-1. Start Kafka in Docker:
-   ```bash
-   docker-compose up -d broker
-   ```
-
-2. Start ML API locally:
-   ```bash
-   cp env.development .env
-   python3 run_local.py
-   ```
-
-3. Start Next.js locally:
-   ```bash
-   cd digital-twin-client
-   cp env.development .env.local
-   npm run dev
-   ```
-
-#### Development Mode Management
+#### Starting Local Development Mode
 ```bash
-# Start all services
+# Start all services (Kafka in Docker, ML API & Next.js local)
 ./dev-mode.sh start
+
+# Check status
+./dev-mode.sh status
 
 # Stop all services
 ./dev-mode.sh stop
@@ -86,11 +99,34 @@ This project supports two distinct operational modes:
 # Restart all services
 ./dev-mode.sh restart
 
-# Check service status
-./dev-mode.sh status
-
 # View logs
 ./dev-mode.sh logs
+```
+
+### Development Mode (Full Docker Stack)
+
+#### Prerequisites
+- Docker installed and running
+- Docker Compose installed
+
+#### Services
+- **Kafka**: `localhost:9092` (Docker)
+- **ML API**: `localhost:8001` (Docker)
+- **Next.js**: `localhost:3001` (Docker)
+
+#### Starting Development Mode
+```bash
+# Start all services in Docker
+docker-compose --profile development up -d
+
+# Check status
+docker-compose --profile development ps
+
+# Stop services
+docker-compose --profile development down
+
+# View logs
+docker-compose --profile development logs
 ```
 
 ### Production Mode
@@ -212,36 +248,49 @@ NEXT_PUBLIC_ML_API_WS_URL=ws://localhost:8000/ws
 NEXT_PUBLIC_KAFKA_TOPIC=prod-occupancy-sensor-data
 ```
 
-## Docker Compose Files
+## Docker Compose Profiles
 
-### Base Configuration (`docker-compose.yaml`)
-- Contains all service definitions
-- Kafka broker configuration
-- Default service settings
+### Profile Structure (`docker-compose.yaml`)
+The main `docker-compose.yaml` file now uses profiles to organize services:
 
-### Development Override (`docker-compose.override.yml`)
-- Disables ML API and Next.js services (they run locally)
-- Configures Kafka for localhost access
-- Automatically used in development mode
+- **`local-dev`**: Kafka only (for local development with ML API and Next.js running locally)
+- **`development`**: Full development stack in Docker (Kafka + ML API + Next.js)
+- **`production`**: Full production stack in Docker (Kafka + ML API + Next.js)
+- **`testing`**: Kafka + test utilities
+- **`full`**: All services (development + production)
+
+### Service Organization
+- **Kafka Broker**: Available in all profiles
+- **ML API Production**: `production`, `full` profiles
+- **ML API Development**: `development`, `full` profiles
+- **Next.js Production**: `production`, `full` profiles
+- **Next.js Development**: `development`, `full` profiles
+- **Kafka Producer**: `testing`, `local-dev` profiles
 
 ### Production Configuration (`docker-compose.prod.yml`)
 - Production-optimized settings
 - Resource limits and restart policies
-- All services run in Docker
+- Used with `--profile production`
 
 ## Service URLs
 
-### Development Mode
+### Local Development Mode
 - **Kafka**: `localhost:9092`
-- **ML API**: `http://localhost:8000`
+- **ML API**: `http://localhost:8000` (Local)
 - **ML API Docs**: `http://localhost:8000/docs`
-- **Next.js**: `http://localhost:3000`
+- **Next.js**: `http://localhost:3000` (Local)
+
+### Development Mode (Docker)
+- **Kafka**: `localhost:9092`
+- **ML API**: `http://localhost:8001` (Docker)
+- **ML API Docs**: `http://localhost:8001/docs`
+- **Next.js**: `http://localhost:3001` (Docker)
 
 ### Production Mode
 - **Kafka**: `localhost:9092`
-- **ML API**: `http://localhost:8000`
+- **ML API**: `http://localhost:8000` (Docker)
 - **ML API Docs**: `http://localhost:8000/docs`
-- **Next.js**: `http://localhost:3000`
+- **Next.js**: `http://localhost:3000` (Docker)
 
 ## Troubleshooting
 
