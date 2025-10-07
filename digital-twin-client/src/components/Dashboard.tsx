@@ -10,6 +10,7 @@ import { SensorDataPoint } from '@/utils/dataParser';
 
 export default function Dashboard() {
   const [currentData, setCurrentData] = useState<SensorDataPoint | null>(null);
+  const [selectedFilename, setSelectedFilename] = useState<string>('');
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -20,6 +21,7 @@ export default function Dashboard() {
             console.info('Data selected:', data);
             setCurrentData(data);
           }}
+          onFileChange={(filename) => setSelectedFilename(filename)}
         />
       </div>
       
@@ -42,7 +44,7 @@ export default function Dashboard() {
               </div>
           </div>
         </div>
-        <LiveSensorCharts />
+        <LiveSensorCharts key={selectedFilename} />
         <KafkaWebSocketClient />
       </div>
     </div>

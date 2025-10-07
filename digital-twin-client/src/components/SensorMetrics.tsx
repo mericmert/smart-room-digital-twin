@@ -62,80 +62,89 @@ export default function SensorMetrics({ currentData }: SensorMetricsProps) {
     date: predictionResult.features.timestamp || currentData?.date
   } : currentData;
 
+  // Derive human-readable anomaly reasons based on backend domain thresholds
+  const anomalyReasons: string[] = (() => {
+    if (!predictionResult?.is_anomaly || !predictionResult?.features) return [];
+    const f = predictionResult.features;
+    const reasons: string[] = [];
+    const within = (v: number, min: number, max: number) => !(v < min || v > max);
+    if (!within(f.Temperature, 10, 40)) {
+      reasons.push(`Temperature ${f.Temperature.toFixed(1)}°C is outside expected 10–40°C`);
+    }
+    if (!within(f.Humidity, 0, 100)) {
+      reasons.push(`Humidity ${f.Humidity.toFixed(1)}% is outside expected 0–100%`);
+    }
+    if (!within(f.Light, 0, 2000)) {
+      reasons.push(`Light ${f.Light.toFixed(0)} lux is outside expected 0–2000 lux`);
+    }
+    if (!within(f.CO2, 300, 2000)) {
+      reasons.push(`CO₂ ${f.CO2.toFixed(0)} ppm is outside expected 300–2000 ppm`);
+    }
+    if (!within(f.HumidityRatio, 0, 0.02)) {
+      reasons.push(`Humidity Ratio ${f.HumidityRatio.toFixed(4)} is outside expected 0–0.0200`);
+    }
+    return reasons;
+  })();
+
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col space-y-4">
       {/* Prediction Display */}
       <div className="card-elevated p-4">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp className="h-5 w-5 text-info" />
           <h3 className="text-lg font-semibold">ML Prediction</h3>
           {predictionResult?.is_anomaly && (
-            <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded-full text-xs font-medium">
+            <div className="flex items-center gap-1 px-2 py-1 bg-error-light text-error rounded-full text-xs font-medium">
               <AlertCircle className="h-3 w-3" />
               Anomaly Detected
             </div>
           )}
         </div>
-        
+  
+        {predictionResult && (
+          <div className="mb-3">
+            {/* Anomaly Reasons */}
+            {predictionResult.is_anomaly && anomalyReasons.length > 0 && (
+                <div className="p-3 rounded-lg border border-error bg-error-light">
+                <div className="text-sm font-semibold text-error mb-1">Reason of Anomaly</div>
+                <ul className="list-disc pl-5 text-sm text-error space-y-0.5">
+                  {anomalyReasons.map((r, idx) => (
+                    <li key={idx}>{r}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-1 gap-3">
           {predictionResult ? (
             <>
               {/* Predicted Occupancy */}
               <div className={`p-3 rounded-lg border-2 ${
                   predictionResult.occupancy === 1 
-                    ? 'bg-occupied-light border-occupied' 
-                    : 'bg-vacant-light border-vacant'
+                    ? 'bg-brand-light border-brand' 
+                    : 'bg-success-light border-success'
                 }`}>
                 <div className="flex items-center gap-2">
                   {predictionResult.occupancy === 1 ? (
-                    <AlertCircle className="h-6 w-6 text-occupied" />
+                    <AlertCircle className="h-6 w-6 text-brand" />
                   ) : (
-                    <CheckCircle className="h-6 w-6 text-vacant" />
+                    <CheckCircle className="h-6 w-6 text-success" />
                   )}
                   <div className="flex-1 min-h-[40px] flex flex-col justify-center">
                     <div className={`text-xs font-medium ${
-                      predictionResult.occupancy === 1 ? 'text-occupied' : 'text-vacant'
+                      predictionResult.occupancy === 1 ? 'text-brand' : 'text-success'
                     }`}>
                       Predicted Occupancy
                     </div>
                     <div className={`text-lg font-bold ${
-                      predictionResult.occupancy === 1 ? 'text-occupied' : 'text-vacant'
+                      predictionResult.occupancy === 1 ? 'text-brand' : 'text-success'
                     }`}>
                       {predictionResult.occupancy === 1 ? 'Occupied' : 'Vacant'}
                     </div>
                   </div>
                 </div>
               </div>
-
-              {/* Actual Occupancy (if available) */}
-              {predictionResult?.actual_occupancy !== undefined && (
-                <div className={`p-3 rounded-lg border-2 ${
-                    predictionResult.actual_occupancy === 1 
-                      ? 'bg-blue-100 border-blue-500' 
-                      : 'bg-gray-100 border-gray-500'
-                  }`}>
-                  <div className="flex items-center gap-2">
-                    {predictionResult.actual_occupancy === 1 ? (
-                      <AlertCircle className="h-6 w-6 text-blue-600" />
-                    ) : (
-                      <CheckCircle className="h-6 w-6 text-gray-600" />
-                    )}
-                    <div className="flex-1 min-h-[40px] flex flex-col justify-center">
-                      <div className={`text-xs font-medium ${
-                        predictionResult.actual_occupancy === 1 ? 'text-blue-600' : 'text-gray-600'
-                      }`}>
-                        Actual Occupancy
-                      </div>
-                      <div className={`text-lg font-bold ${
-                        predictionResult.actual_occupancy === 1 ? 'text-blue-600' : 'text-gray-600'
-                      }`}>
-                        {predictionResult.actual_occupancy === 1 ? 'Occupied' : 'Vacant'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <div className="bg-info-light p-3 rounded-lg border border-info">
                 <div className="flex items-center gap-2">
                   <Activity className="h-6 w-6 text-info" />
@@ -153,6 +162,34 @@ export default function SensorMetrics({ currentData }: SensorMetricsProps) {
                   />
                 </div>
               </div>
+              {/* Actual Occupancy (if available) */}
+              {predictionResult?.actual_occupancy !== undefined && (
+                <div className={`p-3 rounded-lg border-2 ${
+                    predictionResult.actual_occupancy === 1 
+                      ? 'bg-brand-light border-brand' 
+                      : 'bg-success-light border-success'
+                  }`}>
+                  <div className="flex items-center gap-2">
+                    {predictionResult.actual_occupancy === 1 ? (
+                      <AlertCircle className="h-6 w-6 text-brand" />
+                    ) : (
+                      <CheckCircle className="h-6 w-6 text-success" />
+                    )}
+                    <div className="flex-1 min-h-[40px] flex flex-col justify-center">
+                      <div className={`text-xs font-medium ${
+                        predictionResult.actual_occupancy === 1 ? 'text-brand' : 'text-success'
+                      }`}>
+                        Actual Occupancy
+                      </div>
+                      <div className={`text-lg font-bold ${
+                        predictionResult.actual_occupancy === 1 ? 'text-brand' : 'text-success'
+                      }`}>
+                        {predictionResult.actual_occupancy === 1 ? 'Occupied' : 'Vacant'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">

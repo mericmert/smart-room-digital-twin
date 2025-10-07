@@ -15,6 +15,7 @@ import { DataParser, SensorDataPoint } from '@/utils/dataParser';
 
 interface TimeScrubberControlsProps {
   onDataSelect?: (data: SensorDataPoint) => void;
+  onFileChange?: (filename: string) => void;
 }
 
 interface DataFile {
@@ -38,7 +39,7 @@ interface MessageState {
   type: 'success' | 'error' | 'info' | 'stopped';
 }
 
-export default function TimeScrubberControls({ onDataSelect }: TimeScrubberControlsProps) {
+export default function TimeScrubberControls({ onDataSelect, onFileChange }: TimeScrubberControlsProps) {
   const [dataFiles, setDataFiles] = useState<DataFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -256,9 +257,10 @@ export default function TimeScrubberControls({ onDataSelect }: TimeScrubberContr
 
   const handleFileChange = useCallback((filename: string) => {
     setSelectedFile(filename);
+    onFileChange?.(filename);
     loadAllDataForFile(filename);
     stopPlaybackSilently();
-  }, [loadAllDataForFile, stopPlaybackSilently]);
+  }, [loadAllDataForFile, stopPlaybackSilently, onFileChange]);
 
   const handleTimeChange = useCallback((time: string) => {
     setCurrentTime(time);

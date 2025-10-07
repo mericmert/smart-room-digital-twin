@@ -511,8 +511,8 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className={`p-4 rounded-lg border-2 ${
                           prediction.occupancy === 1 
-                            ? 'bg-red-50 border-red-300' 
-                            : 'bg-emerald-50 border-emerald-300'
+                            ? 'bg-occupied-light border-occupied' 
+                            : 'bg-vacant-light border-vacant'
                         }`}>
                         <div className="flex items-center gap-3">
                           {prediction.occupancy === 1 ? (
@@ -526,7 +526,7 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                             }`}>
                               Predicted Occupancy
                               {prediction.is_anomaly && (
-                                <span className="ml-2 text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">
+                                <span className="ml-2 text-xs bg-info-light text-info px-2 py-1 rounded-full">
                                   Anomaly
                                 </span>
                               )}
@@ -539,6 +539,26 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                           </div>
                         </div>
                       </div>
+
+                      {/* Anomaly Reasons */}
+                      {prediction.is_anomaly && prediction.features && (
+                        <div className="p-4 rounded-lg border border-info bg-info-light">
+                          <div className="text-sm font-semibold text-info mb-1">Why flagged as anomaly</div>
+                          <ul className="list-disc pl-5 text-sm text-info space-y-0.5">
+                            {(() => {
+                              const f = prediction.features as any;
+                              const reasons: string[] = [];
+                              const within = (v: number, min: number, max: number) => !(v < min || v > max);
+                              if (!within(f.Temperature, 10, 40)) reasons.push(`Temperature ${Number(f.Temperature).toFixed(1)}°C is outside expected 10–40°C`);
+                              if (!within(f.Humidity, 0, 100)) reasons.push(`Humidity ${Number(f.Humidity).toFixed(1)}% is outside expected 0–100%`);
+                              if (!within(f.Light, 0, 2000)) reasons.push(`Light ${Number(f.Light).toFixed(0)} lux is outside expected 0–2000 lux`);
+                              if (!within(f.CO2, 300, 2000)) reasons.push(`CO₂ ${Number(f.CO2).toFixed(0)} ppm is outside expected 300–2000 ppm`);
+                              if (!within(f.HumidityRatio, 0, 0.02)) reasons.push(`Humidity Ratio ${Number(f.HumidityRatio).toFixed(4)} is outside expected 0–0.0200`);
+                              return reasons.map((r, idx) => (<li key={idx}>{r}</li>));
+                            })()}
+                          </ul>
+                        </div>
+                      )}
 
                       <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
                         <div className="flex items-center gap-3">
