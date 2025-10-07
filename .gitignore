@@ -1,3 +1,10 @@
+# OS/Editor artifacts
+.DS_Store
+
+# Python bytecode/cache
+__pycache__/
+*.py[cod]
+
 .venv/
 venv/
 temp/
