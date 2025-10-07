@@ -2,8 +2,6 @@
 # This file is optimized for production deployment
 # In production mode: All services (Kafka, ML API, Next.js) run in Docker
 
-version: '3.8'
-
 services:
   # Production ML API Service
   occupancy-api:

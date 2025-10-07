@@ -9,7 +9,15 @@ async function loadDataFiles() {
   if (dataCache.size > 0) return;
 
   try {
-    const dataDir = path.join(process.cwd(), '..', 'data');
+    // In Docker, data is mounted at /app/data, otherwise use ../data
+    const dataDir = fs.existsSync('/app/data') 
+      ? '/app/data' 
+      : path.join(process.cwd(), '..', 'data');
+    
+    if (!fs.existsSync(dataDir)) {
+      console.warn(`Data directory not found: ${dataDir}`);
+      return;
+    }
     
     const files = fs.readdirSync(dataDir).filter(file => 
       file.endsWith('.txt') || file.endsWith('.csv')
@@ -65,11 +73,15 @@ export async function GET(request: NextRequest) {
           };
         });
         console.log(`[Replay API] Returning ${fileList.length} files`);
+        const dataDir = fs.existsSync('/app/data') 
+          ? '/app/data' 
+          : path.join(process.cwd(), '..', 'data');
+        
         return NextResponse.json({ 
           success: true, 
           files: fileList,
           cacheSize: dataCache.size,
-          dataDir: path.join(process.cwd(), '..', 'data')
+          dataDir: dataDir
         });
 
       case 'get-data':

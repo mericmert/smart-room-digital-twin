@@ -194,6 +194,8 @@ services:
     container_name: digital-twin-client
     ports:
       - "3000:3000"
+    volumes:
+      - ./data:/app/data:ro
     environment:
       # ML API Configuration
       - ML_API_URL=http://occupancy-api:8000
@@ -261,6 +263,7 @@ services:
         condition: service_healthy
     volumes:
       - ./digital-twin-client:/app:ro
+      - ./data:/app/data:ro
       - nextjs_node_modules:/app/node_modules
       - nextjs_next:/app/.next
     profiles:

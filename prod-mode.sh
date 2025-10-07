@@ -58,7 +58,7 @@ start_prod() {
     
     # Build and start all services
     print_status "Building and starting all services..."
-    docker-compose -f docker-compose.yaml -f docker-compose.prod.yml up -d --build
+    docker-compose --profile production up -d --build
     
     # Wait for services to be ready
     print_status "Waiting for services to be ready..."
@@ -68,21 +68,21 @@ start_prod() {
     print_status "Checking service health..."
     
     # Check Kafka
-    if docker-compose ps broker | grep -q "Up"; then
+    if docker-compose --profile production ps broker | grep -q "Up"; then
         print_success "Kafka: Running"
     else
         print_error "Kafka: Failed to start"
     fi
     
     # Check ML API
-    if docker-compose ps occupancy-api | grep -q "Up"; then
+    if docker-compose --profile production ps occupancy-api | grep -q "Up"; then
         print_success "ML API: Running"
     else
         print_error "ML API: Failed to start"
     fi
     
     # Check Next.js
-    if docker-compose ps digital-twin-client | grep -q "Up"; then
+    if docker-compose --profile production ps digital-twin-client | grep -q "Up"; then
         print_success "Next.js: Running"
     else
         print_error "Next.js: Failed to start"
@@ -101,7 +101,7 @@ stop_prod() {
     print_status "Stopping Production Environment..."
     
     # Stop all services
-    docker-compose -f docker-compose.yaml -f docker-compose.prod.yml down
+    docker-compose --profile production down
     
     print_success "Production environment stopped successfully!"
 }
@@ -111,7 +111,7 @@ status_prod() {
     print_status "Production Environment Status:"
     
     # Show status of all services
-    docker-compose -f docker-compose.yaml -f docker-compose.prod.yml ps
+    docker-compose --profile production ps
 }
 
 # Function to show logs
@@ -120,10 +120,10 @@ logs_prod() {
     
     if [ -n "${2:-}" ]; then
         # Show logs for specific service
-        docker-compose -f docker-compose.yaml -f docker-compose.prod.yml logs -f "$2"
+        docker-compose --profile production logs -f "$2"
     else
         # Show logs for all services
-        docker-compose -f docker-compose.yaml -f docker-compose.prod.yml logs -f
+        docker-compose --profile production logs -f
     fi
 }
 
@@ -136,7 +136,7 @@ restart_service() {
     fi
     
     print_status "Restarting service: $2"
-    docker-compose -f docker-compose.yaml -f docker-compose.prod.yml restart "$2"
+    docker-compose --profile production restart "$2"
     print_success "Service $2 restarted successfully!"
 }
 
@@ -150,7 +150,7 @@ scale_prod() {
     fi
     
     print_status "Scaling service $2 to $3 replicas..."
-    docker-compose -f docker-compose.yaml -f docker-compose.prod.yml up -d --scale "$2=$3"
+    docker-compose --profile production up -d --scale "$2=$3"
     print_success "Service $2 scaled to $3 replicas!"
 }
 
@@ -160,11 +160,11 @@ update_prod() {
     
     # Pull latest images
     print_status "Pulling latest images..."
-    docker-compose -f docker-compose.yaml -f docker-compose.prod.yml pull
+    docker-compose --profile production pull
     
     # Rebuild and restart services
     print_status "Rebuilding and restarting services..."
-    docker-compose -f docker-compose.yaml -f docker-compose.prod.yml up -d --build
+    docker-compose --profile production up -d --build
     
     print_success "Production environment updated successfully!"
 }
