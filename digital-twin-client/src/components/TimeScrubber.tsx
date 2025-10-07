@@ -23,7 +23,14 @@ import { useDataFiles, useDataAtTime, useAllDataForFile, usePrediction } from '@
 
 interface TimeScrubberProps {
   onDataSelect?: (data: SensorDataPoint) => void;
-  onPrediction?: (prediction: { occupancy: number; probability: number }) => void;
+  onPrediction?: (prediction: { 
+    occupancy: number; 
+    probability: number; 
+    is_anomaly?: boolean;
+    features?: any;
+    status?: string;
+    model_version?: string;
+  }) => void;
 }
 
 export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubberProps) {
@@ -31,7 +38,14 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
   const [currentTime, setCurrentTime] = useState<string>('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [prediction, setPrediction] = useState<{ occupancy: number; probability: number } | null>(null);
+  const [prediction, setPrediction] = useState<{ 
+    occupancy: number; 
+    probability: number; 
+    is_anomaly?: boolean;
+    features?: any;
+    status?: string;
+    model_version?: string;
+  } | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentIndexRef = useRef<number>(0);
 
@@ -143,6 +157,19 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
   };
 
   const handleTimeChange = (time: string) => {
+    // Validate time is within the selected file's time range
+    if (time && timeRange) {
+      const selectedTime = new Date(time);
+      const startTime = new Date(timeRange.start);
+      const endTime = new Date(timeRange.end);
+      
+      if (selectedTime < startTime || selectedTime > endTime) {
+        // Don't update the time if it's outside the range
+        console.warn('Selected time is outside the file time range');
+        return;
+      }
+    }
+    
     setCurrentTime(time);
     // React Query will automatically fetch data when currentTime changes
     // Prediction will be triggered when dataAtTime updates (if not playing)
@@ -244,6 +271,7 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                       max={timeRange.end ? new Date(timeRange.end).toISOString().slice(0, 16) : ''}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm"
                       disabled={isLoadingDataAtTime}
+                      title={`Select a time between ${timeRange.start ? new Date(timeRange.start).toLocaleString() : 'start'} and ${timeRange.end ? new Date(timeRange.end).toLocaleString() : 'end'}`}
                     />
                     {isLoadingDataAtTime && (
                       <div className="flex items-center gap-2 text-sm text-blue-600 mt-2">
@@ -251,6 +279,11 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                         Loading data...
                       </div>
                     )}
+                    
+                    {/* Time Range Info */}
+                    <div className="text-xs text-gray-500 mt-1">
+                      Valid range: {timeRange.start ? new Date(timeRange.start).toLocaleString() : 'N/A'} - {timeRange.end ? new Date(timeRange.end).toLocaleString() : 'N/A'}
+                    </div>
                   </div>
                   
                   <div className="flex gap-2">
@@ -492,6 +525,11 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
                               prediction.occupancy === 1 ? 'text-red-700' : 'text-emerald-700'
                             }`}>
                               Predicted Occupancy
+                              {prediction.is_anomaly && (
+                                <span className="ml-2 text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full">
+                                  Anomaly
+                                </span>
+                              )}
                             </div>
                             <div className={`text-2xl font-bold ${
                               prediction.occupancy === 1 ? 'text-red-900' : 'text-emerald-900'

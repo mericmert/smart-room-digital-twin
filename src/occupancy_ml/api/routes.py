@@ -8,8 +8,8 @@ from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, status
 
 from ..config import KAFKA_BOOTSTRAP_SERVERS, KAFKA_TOPIC
-from .models import OccupancyRequest, OccupancyResponse, HealthResponse
-from ..ml.prediction import predict_occupancy
+from .models import OccupancyRequest, OccupancyResponse, EnhancedOccupancyResponse, HealthResponse
+from ..ml.prediction import predict_occupancy, predict_occupancy_enhanced
 from ..ml.model_manager import get_model_manager
 
 logger = logging.getLogger(__name__)
@@ -126,3 +126,80 @@ def predict(request: OccupancyRequest) -> OccupancyResponse:
         )
 
 
+@router.post("/predict-enhanced", response_model=EnhancedOccupancyResponse)
+def predict_enhanced(request: OccupancyRequest) -> EnhancedOccupancyResponse:
+    """Enhanced occupancy prediction with anomaly detection."""
+    try:
+        # Convert Pydantic model to dict for processing
+        request_data = request.dict()
+        
+        # Make enhanced prediction with anomaly detection
+        result = predict_occupancy_enhanced(request_data)
+        
+        return EnhancedOccupancyResponse(**result)
+        
+    except ValueError as e:
+        logger.warning(f"Validation error in enhanced prediction request: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": "Validation error",
+                "message": str(e),
+                "error_type": "validation_error"
+            }
+        )
+    except RuntimeError as e:
+        logger.error(f"Model not available: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "Model not available",
+                "message": str(e),
+                "error_type": "model_unavailable"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error in enhanced prediction: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "Internal server error",
+                "message": "An unexpected error occurred",
+                "error_type": "internal_error"
+            }
+        )
+
+
+@router.post("/prediction-result", response_model=EnhancedOccupancyResponse)
+def receivePredictionResult(result_data: Dict[str, Any]) -> EnhancedOccupancyResponse:
+    """Receive processed prediction results from the processing pipeline."""
+    try:
+        # Validate that the result contains required fields
+        required_fields = ['features', 'prob', 'occupancy', 'is_anomaly']
+        for field in required_fields:
+            if field not in result_data:
+                raise ValueError(f"Missing required field: {field}")
+        
+        # Create response from prediction result
+        return EnhancedOccupancyResponse(**result_data)
+        
+    except ValueError as e:
+        logger.warning(f"Validation error in prediction result: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error": "Validation error",
+                "message": str(e),
+                "error_type": "validation_error"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Unexpected error processing prediction result: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error": "Internal server error",
+                "message": "An unexpected error occurred",
+                "error_type": "internal_error"
+            }
+        )

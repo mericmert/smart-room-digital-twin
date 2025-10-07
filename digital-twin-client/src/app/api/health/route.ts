@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    // Check if we can connect to ML API
+    // Check if we can connect to API
     const mlApiUrl = process.env.ML_API_URL || 'http://localhost:8000';
     const kafkaBrokerUrl = process.env.KAFKA_BROKER_URL || 'localhost:9092';
     

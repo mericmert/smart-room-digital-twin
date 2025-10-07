@@ -199,6 +199,7 @@ export class DataParser {
       Light: dataPoint.Light,
       CO2: dataPoint.CO2,
       HumidityRatio: dataPoint.HumidityRatio,
+      actualOccupancy: dataPoint.Occupancy, // Include actual occupancy in main message
       // Include original data for reference
       originalData: {
         id: dataPoint.id,

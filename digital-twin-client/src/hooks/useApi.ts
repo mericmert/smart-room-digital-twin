@@ -13,7 +13,12 @@ interface DataFile {
 
 interface PredictionResult {
   occupancy: number;
+  actual_occupancy?: number; // Add actual occupancy field
   probability: number;
+  is_anomaly?: boolean;
+  features?: any;
+  status?: string;
+  model_version?: string;
 }
 
 interface ApiResponse<T> {
@@ -96,10 +101,15 @@ const predictOccupancy = async (dataPoint: SensorDataPoint): Promise<PredictionR
 
   const predictionResult = await response.json();
   
-  if (predictionResult.occupancy !== undefined && predictionResult.probability !== undefined) {
+  // Handle both legacy and enhanced response formats
+  if (predictionResult.occupancy !== undefined && (predictionResult.probability !== undefined || predictionResult.prob !== undefined)) {
     return {
       occupancy: predictionResult.occupancy,
-      probability: predictionResult.probability
+      probability: predictionResult.probability !== undefined ? predictionResult.probability : predictionResult.prob,
+      is_anomaly: predictionResult.is_anomaly,
+      features: predictionResult.features,
+      status: predictionResult.status,
+      model_version: predictionResult.model_version
     };
   } else {
     throw new Error('Invalid prediction response from ML API');

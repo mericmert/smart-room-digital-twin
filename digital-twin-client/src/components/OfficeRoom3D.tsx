@@ -31,9 +31,33 @@ export default function OfficeRoom3D({
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [predictionResult, setPredictionResult] = useState<any>(null);
 
-  // Convert sensor data to visualization metrics
-  const getMetrics = (data: SensorDataPoint | null): MetricVisualization => {
+  // Listen for prediction results from WebSocket
+  useEffect(() => {
+    const handlePredictionResult = (event: CustomEvent<any>) => {
+      setPredictionResult(event.detail);
+    };
+
+    window.addEventListener('predictionResult', handlePredictionResult as EventListener);
+    
+    return () => {
+      window.removeEventListener('predictionResult', handlePredictionResult as EventListener);
+    };
+  }, []);
+
+  const getMetrics = (data: SensorDataPoint | null, predictionResult?: any): MetricVisualization => {
+    // Use prediction result data if available, otherwise fall back to CSV data
+    if (predictionResult?.features) {
+      return {
+        occupancy: predictionResult.occupancy, // Use predicted occupancy
+        temperature: predictionResult.features.Temperature,
+        light: predictionResult.features.Light,
+        co2: predictionResult.features.CO2,
+        humidity: predictionResult.features.Humidity
+      };
+    }
+    
     if (!data) {
       return {
         occupancy: 0,
@@ -523,11 +547,11 @@ export default function OfficeRoom3D({
 
   // Update room when data changes
   useEffect(() => {
-    if (isInitialized && data) {
-      const metrics = getMetrics(data);
+    if (isInitialized && (data || predictionResult)) {
+      const metrics = getMetrics(data || null, predictionResult);
       updateRoom(metrics);
     }
-  }, [data, isInitialized]);
+  }, [data, predictionResult, isInitialized]);
 
   return (
     <div className="w-full max-w-6xl mx-auto">

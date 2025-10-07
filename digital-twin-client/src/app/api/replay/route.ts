@@ -169,21 +169,29 @@ export async function POST(request: NextRequest) {
 
         const kafkaData = DataParser.formatSensorDataForKafka(dataAtTime);
         
+        // Send data to Kafka for processing (features will be processed via Kafka, not HTTP)
         const kafkaResponse = await fetch(`${request.nextUrl.origin}/api/kafka`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
+          body: JSON.stringify({
+            sensorData: kafkaData,
+            source: 'replay',
+            filename: filename,
+            timestamp: time
+          })
         });
 
         const kafkaResult = await kafkaResponse.json();
 
         return NextResponse.json({
           success: true,
-          message: `Sent data from ${filename} at ${time}`,
+          message: `Sent data from ${filename} at ${time} to Kafka for processing`,
           sensorData: kafkaData,
           kafkaResult: kafkaResult,
-          originalData: dataAtTime
+          originalData: dataAtTime,
+          note: "Results will be delivered via WebSocket to connected clients"
         });
 
       default:

@@ -6,8 +6,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Forward the request to the ML API
-    const response = await fetch(`${ML_API_BASE_URL}/predict`, {
+    // Use enhanced predict endpoint that includes anomaly detection
+    const response = await fetch(`${ML_API_BASE_URL}/predict-enhanced`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -64,14 +64,31 @@ export async function POST(request: NextRequest) {
     const enableKafka = process.env.ENABLE_KAFKA !== 'false';
     const useSimulation = !enableKafka || brokerUrl === 'simulation';
     
-    // Generate realistic sensor data
-    const sensorData = {
+    // Parse request body to check if sensor data is provided
+    let requestBody = null;
+    try {
+      requestBody = await request.json();
+    } catch (e) {
+      // If no body, continue with generated data
+    }
+    
+    // Use provided sensor data or generate realistic sensor data
+    const sensorData = requestBody?.sensorData || {
       timestamp: new Date().toISOString(),
       Temperature: Math.round((Math.random() * 10 + 20) * 10) / 10, // 20-30°C
       Humidity: Math.round((Math.random() * 30 + 40) * 10) / 10, // 40-70%
       Light: Math.round(Math.random() * 1000), // 0-1000 lux
       CO2: Math.round(Math.random() * 500 + 400), // 400-900 ppm
       HumidityRatio: Math.round((Math.random() * 0.01 + 0.005) * 1000) / 1000 // 0.005-0.015
+    };
+    
+    // Add metadata if provided
+    const messageMetadata = requestBody ? {
+      source: requestBody.source || 'generated',
+      filename: requestBody.filename,
+      timestamp: requestBody.timestamp
+    } : {
+      source: 'generated'
     };
     
     if (useSimulation) {
@@ -99,11 +116,18 @@ export async function POST(request: NextRequest) {
     
     console.log(`[Kafka] Sending message to topic "${topic}"...`);
     
+    // Create the complete message with sensor data and metadata
+    const kafkaMessage = {
+      ...sensorData,
+      metadata: messageMetadata,
+      processed_at: new Date().toISOString()
+    };
+    
     await producer.send({
       topic,
       messages: [
         {
-          value: JSON.stringify(sensorData),
+          value: JSON.stringify(kafkaMessage),
           timestamp: Date.now().toString(),
         },
       ],
@@ -116,6 +140,7 @@ export async function POST(request: NextRequest) {
         success: true, 
         message: `Sensor data sent to topic "${topic}"`,
         sensorData: sensorData,
+        metadata: messageMetadata,
         config: {
           broker: process.env.KAFKA_BROKER_URL || 'localhost:9092',
           topic,

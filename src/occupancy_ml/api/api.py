@@ -8,11 +8,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..config import LOG_LEVEL
-from .kafka import start_kafka_consumer
+from .kafka import startLegacyPredictionConsumer, startPredictionProcessor
 from ..ml.prediction import process_sensor_data
 from ..ml.model_manager import initialize_model_manager
 from .routes import router
 from .data_routes import router as data_router
+from .websocket_routes import router as websocket_router
 
 logging.basicConfig(level=getattr(logging, LOG_LEVEL.upper()))
 logger = logging.getLogger(__name__)
@@ -46,19 +47,25 @@ async def lifespan(app: FastAPI):
     
     if enable_kafka:
         try:
-            # Start Kafka consumer with the new simplified callback
-            start_kafka_consumer(process_sensor_data)
-            logger.info(f"Kafka consumer started for topic: {os.environ.get('KAFKA_TOPIC', 'test-topic')}")
+            # Start enhanced prediction processor with anomaly detection
+            startPredictionProcessor()
+            logger.info(f"Enhanced prediction processor started for topic: {os.environ.get('KAFKA_TOPIC', 'test-topic')}")
         except Exception as e:
-            logger.error(f"Failed to start Kafka consumer: {e}")
-            # Don't fail startup if Kafka is not available
+            logger.error(f"Failed to start enhanced prediction processor: {e}")
+            # Fallback to legacy consumer
+            try:
+                startLegacyPredictionConsumer(process_sensor_data)
+                logger.info(f"Legacy prediction consumer started for topic: {os.environ.get('KAFKA_TOPIC', 'test-topic')}")
+            except Exception as fallback_e:
+                logger.error(f"Failed to start legacy prediction consumer: {fallback_e}")
+                # Don't fail startup if Kafka is not available
     else:
-        logger.info("Kafka consumer disabled - set ENABLE_KAFKA=true to enable")
+        logger.info("Prediction processor disabled - set ENABLE_KAFKA=true to enable")
     
     logger.info("API startup complete")
     yield
     
-    # Cleanup (if needed in the future)
+    # Cleanup
     logger.info("API shutdown complete")
 
 
@@ -69,14 +76,12 @@ app = FastAPI(
     description="ML-powered occupancy prediction API with Kafka integration"
 )
 
-# Add CORS middleware
-# Get CORS settings from environment
 enable_cors = os.environ.get("ENABLE_CORS", "true").lower() == "true"
 
 if enable_cors:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # In production, specify exact origins
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -84,3 +89,4 @@ if enable_cors:
 
 app.include_router(router)
 app.include_router(data_router)
+app.include_router(websocket_router)

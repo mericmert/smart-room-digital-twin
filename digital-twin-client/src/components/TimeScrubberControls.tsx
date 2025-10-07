@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Play, 
   Pause, 
@@ -8,15 +8,13 @@ import {
   SkipForward, 
   RotateCcw, 
   RotateCw, 
-  FileText, 
   Clock, 
   CheckCircle
 } from 'lucide-react';
-import { DataParser, SensorDataPoint, ParsedDataFile } from '@/utils/dataParser';
+import { DataParser, SensorDataPoint } from '@/utils/dataParser';
 
 interface TimeScrubberControlsProps {
   onDataSelect?: (data: SensorDataPoint) => void;
-  onPrediction?: (prediction: { occupancy: number; probability: number }) => void;
 }
 
 interface DataFile {
@@ -40,11 +38,10 @@ interface MessageState {
   type: 'success' | 'error' | 'info' | 'stopped';
 }
 
-export default function TimeScrubberControls({ onDataSelect, onPrediction }: TimeScrubberControlsProps) {
+export default function TimeScrubberControls({ onDataSelect }: TimeScrubberControlsProps) {
   const [dataFiles, setDataFiles] = useState<DataFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<string>('');
   const [currentTime, setCurrentTime] = useState<string>('');
-  const [currentData, setCurrentData] = useState<SensorDataPoint | null>(null);
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     isPlaying: false,
     speed: 1,
@@ -52,7 +49,6 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
     totalRecords: 0
   });
   const [message, setMessage] = useState<MessageState>({ text: '', type: 'info' });
-  const [prediction, setPrediction] = useState<{ occupancy: number; probability: number } | null>(null);
   
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const allDataRef = useRef<SensorDataPoint[]>([]);
@@ -135,7 +131,6 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
         
         if (allDataRef.current.length > 0) {
           const firstData = allDataRef.current[0];
-          setCurrentData(firstData);
           setCurrentTime(firstData.date);
           onDataSelect?.(firstData);
         }
@@ -175,10 +170,9 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
 
     // Immediately show the data for the start time
     const startData = allDataRef.current[playbackState.currentIndex];
-    setCurrentData(startData);
     setCurrentTime(startData.date);
     onDataSelect?.(startData);
-    getPrediction(startData);
+    sendToKafka(startData);
 
     updatePlaybackState({ isPlaying: true });
     updateMessage(`Playback started from ${new Date(startData.date).toLocaleString()}`, 'info');
@@ -189,12 +183,11 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
         const newIndex = currentState.currentIndex + 1;
         updatePlaybackState({ currentIndex: newIndex });
         const data = allDataRef.current[newIndex];
-        setCurrentData(data);
         setCurrentTime(data.date);
         onDataSelect?.(data);
         
-        // Get prediction for current data
-        getPrediction(data);
+        // Send data to Kafka for processing
+        sendToKafka(data);
       } else {
         stopPlayback();
       }
@@ -220,43 +213,34 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
     updatePlaybackState({ isPlaying: false });
   }, [updatePlaybackState]);
 
-  const getPrediction = useCallback(async (data: SensorDataPoint) => {
+  const sendToKafka = useCallback(async (data: SensorDataPoint) => {
     try {
-      const response = await fetch('/api/ml/predict', {
+      // Send data to Kafka for processing instead of HTTP prediction
+      const response = await fetch('/api/replay', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          date: data.date,
-          Temperature: data.Temperature,
-          Humidity: data.Humidity,
-          Light: data.Light,
-          CO2: data.CO2,
-          HumidityRatio: data.HumidityRatio
+          action: 'send-kafka-message',
+          filename: selectedFile,
+          time: data.date
         }),
       });
 
       if (response.ok) {
         const result = await response.json();
-        // The ML API returns the prediction directly with occupancy and probability fields
-        if (result.occupancy !== undefined && result.probability !== undefined) {
-          const prediction = {
-            occupancy: result.occupancy,
-            probability: result.probability
-          };
-          setPrediction(prediction);
-          onPrediction?.(prediction);
-        } else {
-          console.error('Invalid prediction response:', result);
-        }
+        console.log('Data sent to Kafka:', result);
+        updateMessage(`Data sent to Kafka for processing`, 'success');
       } else {
-        console.error('Prediction API error:', response.status, await response.text());
+        console.error('Failed to send data to Kafka:', response.status);
+        updateMessage('Failed to send data to Kafka', 'error');
       }
     } catch (error) {
-      console.error('Error getting prediction:', error);
+      console.error('Error sending data to Kafka:', error);
+      updateMessage('Error sending data to Kafka', 'error');
     }
-  }, [onPrediction]);
+  }, [selectedFile, updateMessage]);
 
   const handleFileChange = useCallback((filename: string) => {
     setSelectedFile(filename);
@@ -277,12 +261,22 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
           return;
         }
         
+        // Check if the selected time is within the data range
+        const firstData = allDataRef.current[0];
+        const lastData = allDataRef.current[allDataRef.current.length - 1];
+        const startTime = DataParser.parseDate(firstData.date);
+        const endTime = DataParser.parseDate(lastData.date);
+        
+        if (startTime && endTime && (targetTime < startTime || targetTime > endTime)) {
+          updateMessage('Selected time is outside the data range. Please select a time within the file range.', 'error');
+          return;
+        }
+        
         // Use the DataParser method to find the closest data point
         const data = DataParser.getDataAtTime(allDataRef.current, targetTime);
         if (data) {
-          setCurrentData(data);
           onDataSelect?.(data);
-          getPrediction(data);
+          sendToKafka(data);
           // Update the current index to match the found data
           const index = allDataRef.current.findIndex(d => d.date === data.date);
           if (index !== -1) {
@@ -297,54 +291,50 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
         updateMessage('Error processing time selection. Please try again.', 'error');
       }
     }
-  }, [updateMessage, updatePlaybackState, onDataSelect, getPrediction]);
+  }, [updateMessage, updatePlaybackState, onDataSelect, sendToKafka]);
 
   const skipToStart = useCallback(() => {
     if (allDataRef.current.length > 0) {
       updatePlaybackState({ currentIndex: 0 });
       const data = allDataRef.current[0];
-      setCurrentData(data);
       setCurrentTime(data.date);
       onDataSelect?.(data);
-      getPrediction(data);
+      sendToKafka(data);
     }
-  }, [updatePlaybackState, onDataSelect, getPrediction]);
+  }, [updatePlaybackState, onDataSelect, sendToKafka]);
 
   const skipToEnd = useCallback(() => {
     if (allDataRef.current.length > 0) {
       const lastIndex = allDataRef.current.length - 1;
       updatePlaybackState({ currentIndex: lastIndex });
       const data = allDataRef.current[lastIndex];
-      setCurrentData(data);
       setCurrentTime(data.date);
       onDataSelect?.(data);
-      getPrediction(data);
+      sendToKafka(data);
     }
-  }, [updatePlaybackState, onDataSelect, getPrediction]);
+  }, [updatePlaybackState, onDataSelect, sendToKafka]);
 
   const stepBackward = useCallback(() => {
     if (playbackState.currentIndex > 0) {
       const newIndex = playbackState.currentIndex - 1;
       updatePlaybackState({ currentIndex: newIndex });
       const data = allDataRef.current[newIndex];
-      setCurrentData(data);
       setCurrentTime(data.date);
       onDataSelect?.(data);
-      getPrediction(data);
+      sendToKafka(data);
     }
-  }, [playbackState.currentIndex, updatePlaybackState, onDataSelect, getPrediction]);
+  }, [playbackState.currentIndex, updatePlaybackState, onDataSelect, sendToKafka]);
 
   const stepForward = useCallback(() => {
     if (playbackState.currentIndex < allDataRef.current.length - 1) {
       const newIndex = playbackState.currentIndex + 1;
       updatePlaybackState({ currentIndex: newIndex });
       const data = allDataRef.current[newIndex];
-      setCurrentData(data);
       setCurrentTime(data.date);
       onDataSelect?.(data);
-      getPrediction(data);
+      sendToKafka(data);
     }
-  }, [playbackState.currentIndex, updatePlaybackState, onDataSelect, getPrediction]);
+  }, [playbackState.currentIndex, updatePlaybackState, onDataSelect, sendToKafka]);
 
   const adjustTime = useCallback((milliseconds: number) => {
     if (currentTime && allDataRef.current.length > 0) {
@@ -424,8 +414,18 @@ export default function TimeScrubberControls({ onDataSelect, onPrediction }: Tim
                     handleTimeChange('');
                   }
                 }}
+                min={allDataRef.current.length > 0 ? toDateTimeLocal(allDataRef.current[0].date) : ''}
+                max={allDataRef.current.length > 0 ? toDateTimeLocal(allDataRef.current[allDataRef.current.length - 1].date) : ''}
                 className="input w-full"
+                title={allDataRef.current.length > 0 ? `Select a time between ${new Date(allDataRef.current[0].date).toLocaleString()} and ${new Date(allDataRef.current[allDataRef.current.length - 1].date).toLocaleString()}` : 'Select a time'}
               />
+              
+              {/* Time Range Info */}
+              {allDataRef.current.length > 0 && (
+                <div className="text-xs text-gray-500">
+                  Valid range: {new Date(allDataRef.current[0].date).toLocaleString()} - {new Date(allDataRef.current[allDataRef.current.length - 1].date).toLocaleString()}
+                </div>
+              )}
               
               {/* Quick Time Adjustment Buttons */}
               <div className="grid grid-cols-4 gap-1">

@@ -7,7 +7,6 @@ from fastapi.responses import FileResponse
 
 router = APIRouter()
 
-# Get the project root directory
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 
@@ -16,7 +15,6 @@ async def get_data_file(filename: str):
     """Serve sensor data files."""
     file_path = DATA_DIR / filename
     
-    # Security check - ensure file is in data directory and has allowed extension
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
     
@@ -24,7 +22,6 @@ async def get_data_file(filename: str):
     if not (filename.endswith('.txt') or filename.endswith('.csv')):
         raise HTTPException(status_code=404, detail="File type not allowed")
     
-    # Ensure the file is within the data directory (path traversal protection)
     try:
         file_path.resolve().relative_to(DATA_DIR.resolve())
     except ValueError:
