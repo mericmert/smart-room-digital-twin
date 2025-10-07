@@ -7,7 +7,7 @@ let producerConnecting: Promise<void> | null = null;
 
 // Environment-aware Kafka configuration
 const getKafkaConfig = () => {
-  const brokerUrl = process.env.KAFKA_BROKER_URL || 'localhost:9092';
+  const brokerUrl = process.env.KAFKA_BROKER_URL || 'localhost:19092';
   const topic = process.env.KAFKA_TOPIC || 'docker-occupancy-data';
   const clientId = process.env.KAFKA_CLIENT_ID || 'digital-twin-client';
 
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     const { topic, clientId } = getKafkaConfig();
     
     // Check if we should use simulation mode (only if explicitly disabled)
-    const brokerUrl = process.env.KAFKA_BROKER_URL || 'localhost:9092';
+    const brokerUrl = process.env.KAFKA_BROKER_URL || 'localhost:19092';
     const enableKafka = process.env.ENABLE_KAFKA !== 'false';
     const useSimulation = !enableKafka || brokerUrl === 'simulation';
     
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
         sensorData: sensorData,
         metadata: messageMetadata,
         config: {
-          broker: process.env.KAFKA_BROKER_URL || 'localhost:9092',
+          broker: process.env.KAFKA_BROKER_URL || 'localhost:19092',
           topic,
           clientId
         },
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
           error: `Kafka broker not available: ${errorMessage}`,
           suggestion: "Make sure Kafka is running locally or use Docker Compose",
           config: {
-            broker: process.env.KAFKA_BROKER_URL || 'localhost:9092',
+            broker: process.env.KAFKA_BROKER_URL || 'localhost:19092',
             topic: process.env.KAFKA_TOPIC || 'docker-occupancy-data',
             clientId: process.env.KAFKA_CLIENT_ID || 'digital-twin-client'
           },
@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
         success: false, 
         error: `Failed to send Kafka message: ${errorMessage}`,
         config: {
-          broker: process.env.KAFKA_BROKER_URL || 'localhost:9092',
+          broker: process.env.KAFKA_BROKER_URL || 'localhost:19092',
           topic: process.env.KAFKA_TOPIC || 'docker-occupancy-data',
           clientId: process.env.KAFKA_CLIENT_ID || 'digital-twin-client'
         },
