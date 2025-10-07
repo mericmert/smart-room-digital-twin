@@ -1,4 +1,7 @@
 .venv/
+venv/
 temp/
 cache/
+artifacts/mpl_cache/
+.cursor/
 *.egg-info/
