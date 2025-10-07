@@ -5,6 +5,7 @@ import TimeScrubberControls from '@/components/TimeScrubberControls';
 import OfficeRoom3D from '@/components/OfficeRoom3D';
 import SensorMetrics from '@/components/SensorMetrics';
 import KafkaWebSocketClient from '@/components/KafkaWebSocketClient';
+import LiveSensorCharts from '@/components/LiveSensorCharts';
 import { SensorDataPoint } from '@/utils/dataParser';
 
 export default function Dashboard() {
@@ -33,11 +34,12 @@ export default function Dashboard() {
                      />
                    </div>
                    
-                   {/* Sensor Metrics and Kafka Results */}
-                   <div className="flex-1 lg:flex-[1] space-y-4">
+                  {/* Sensor Metrics, Live Charts and Kafka Results */}
+                  <div className="flex-1 lg:flex-[1] space-y-4">
                      <SensorMetrics 
                        currentData={currentData}
                      />
+                    <LiveSensorCharts />
                      <KafkaWebSocketClient />
                    </div>
           </div>

@@ -109,7 +109,6 @@ class EnhancedPredictionProcessor:
             occupancy = prediction_result.get('occupancy', -1)
             probability = prediction_result.get('probability', 0.0)
             
-            # Create comprehensive result
             result = {
                 'features': features,
                 'prob': probability,

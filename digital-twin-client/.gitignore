@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# OS/Editor artifacts
+.DS_Store
+
+# Python bytecode/cache
+__pycache__/
+*.py[cod]
