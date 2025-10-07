@@ -27,23 +27,23 @@ export default function Dashboard() {
       <div className="w-full">
         <div className="rounded-xl p-6">
           <div className="flex flex-col lg:flex-row gap-6">
-                   {/* 3D Office Room */}
-                   <div className="flex-1 lg:flex-[2]">
-                     <OfficeRoom3D 
-                       data={currentData}
-                     />
-                   </div>
-                   
-                  {/* Sensor Metrics, Live Charts and Kafka Results */}
-                  <div className="flex-1 lg:flex-[1] space-y-4">
-                     <SensorMetrics 
-                       currentData={currentData}
-                     />
-                    <LiveSensorCharts />
-                     <KafkaWebSocketClient />
-                   </div>
+              {/* 3D Office Room */}
+              <div className="flex-1 lg:flex-[2]">
+                <OfficeRoom3D 
+                  data={currentData}
+                />
+              </div>
+              
+            {/* Sensor Metrics, Live Charts and Kafka Results */}
+            <div className="flex-1 lg:flex-[1] space-y-4">
+                <SensorMetrics 
+                  currentData={currentData}
+                />
+              </div>
           </div>
         </div>
+        <LiveSensorCharts />
+        <KafkaWebSocketClient />
       </div>
     </div>
   );

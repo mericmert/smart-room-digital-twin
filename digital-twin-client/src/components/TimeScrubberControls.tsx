@@ -168,8 +168,20 @@ export default function TimeScrubberControls({ onDataSelect }: TimeScrubberContr
       }
     }
 
-    // Immediately show the data for the start time
     const startData = allDataRef.current[playbackState.currentIndex];
+    const endData = allDataRef.current[allDataRef.current.length - 1];
+
+    try {
+      const startMs = new Date(startData.date).getTime();
+      const endMs = new Date(endData.date).getTime();
+      window.dispatchEvent(
+        new CustomEvent('playbackStart', {
+          detail: { start: startMs, end: endMs }
+        })
+      );
+    } catch (e) {
+      // ignore
+    }
     setCurrentTime(startData.date);
     onDataSelect?.(startData);
     sendToKafka(startData);

@@ -78,15 +78,34 @@ export default function LiveSensorCharts({ maxPoints = 120 }: LiveSensorChartsPr
           pr.actual_occupancy !== undefined ? pr.actual_occupancy : pr.occupancy
       };
 
-      const next = [...dataRef.current, point];
+      const existingIndex = dataRef.current.findIndex((p) => p.time === ts);
+      const next = existingIndex !== -1
+        ? (() => {
+            const copy = [...dataRef.current];
+            copy[existingIndex] = point;
+            return copy;
+          })()
+        : [...dataRef.current, point];
       const trimmed = next.length > maxPoints ? next.slice(next.length - maxPoints) : next;
       dataRef.current = trimmed;
       setData(trimmed);
     };
 
+    const handlePlaybackStart = (event: Event) => {
+      const custom = event as CustomEvent<{ start: number; end: number }>;
+      const { start, end } = custom.detail || {} as any;
+      if (typeof start !== 'number' || typeof end !== 'number') return;
+      // Clear any existing points within the playback range so they will be replaced
+      const filtered = dataRef.current.filter((p) => p.time < start || p.time > end);
+      dataRef.current = filtered;
+      setData(filtered);
+    };
+
     window.addEventListener('predictionResult', handlePredictionResult as EventListener);
+    window.addEventListener('playbackStart', handlePlaybackStart as EventListener);
     return () => {
       window.removeEventListener('predictionResult', handlePredictionResult as EventListener);
+      window.removeEventListener('playbackStart', handlePlaybackStart as EventListener);
     };
   }, [maxPoints]);
 
@@ -95,17 +114,17 @@ export default function LiveSensorCharts({ maxPoints = 120 }: LiveSensorChartsPr
       {
         key: 'Temperature' as SensorKey,
         title: 'Temperature (°C)',
-        color: '#f97316'
+        color: 'var(--color-temperature)'
       },
-      { key: 'Humidity' as SensorKey, title: 'Humidity (%)', color: '#3b82f6' },
-      { key: 'Light' as SensorKey, title: 'Light (lux)', color: '#eab308' },
-      { key: 'CO2' as SensorKey, title: 'CO2 (ppm)', color: '#10b981' },
+      { key: 'Humidity' as SensorKey, title: 'Humidity (%)', color: 'var(--color-humidity)' },
+      { key: 'Light' as SensorKey, title: 'Light (lux)', color: 'var(--color-light)' },
+      { key: 'CO2' as SensorKey, title: 'CO2 (ppm)', color: 'var(--color-co2)' },
       {
         key: 'HumidityRatio' as SensorKey,
         title: 'Humidity Ratio',
-        color: '#8b5cf6'
+        color: 'var(--color-info)'
       },
-      { key: 'Occupancy' as SensorKey, title: 'Occupancy', color: '#ef4444' }
+      { key: 'Occupancy' as SensorKey, title: 'Occupancy', color: 'var(--color-occupancy-occupied)' }
     ],
     []
   );
@@ -117,7 +136,7 @@ export default function LiveSensorCharts({ maxPoints = 120 }: LiveSensorChartsPr
         <div className="text-xs text-secondary">Streaming from WebSocket</div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {charts.map(({ key, title, color }) => (
           <div key={key} className="bg-white rounded-lg border border-gray-200 p-3">
             <div className="text-sm font-medium mb-2">{title}</div>
