@@ -12,7 +12,7 @@ from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
 from sklearn.pipeline import Pipeline
 from .modeling import build_pipeline, param_grid
 from .metrics import compute_metrics, plot_probability_curves, find_optimal_threshold
-from .features import build_feature_matrix
+from .features import build_feature_matrix, align_and_impute_like_train
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,9 @@ def temporal_cv_train(
 
     X, feature_names = build_feature_matrix(df_train, timestamp_col=timestamp_col, target_col=target_col)
     y = df_train[target_col].astype("int64").to_numpy()
+    
+    # Store training medians for imputation during evaluation
+    training_medians = X.median(numeric_only=True).to_dict()
 
     pipe = build_pipeline(random_state=random_state)
     cv_splits, cv_pos_counts, effective_splits = _build_temporal_splits(
@@ -136,6 +139,7 @@ def temporal_cv_train(
         "effective_n_splits": effective_splits,
         "selected_threshold": selected_threshold,
         "threshold_info": threshold_info,
+        "training_medians": training_medians,
     }
 
 def save_artifacts(artifacts_dir: Path | str, model, feature_names, metadata: Dict[str, Any]) -> None:
@@ -170,8 +174,19 @@ def evaluate_on(
     # Build features and align to training schema
     X_new, _ = build_feature_matrix(df, timestamp_col=timestamp_col, target_col=target_col)
     X_new = X_new.reindex(columns=feature_names)
+    
+    # Handle missing values by imputing with training medians
     if X_new.isna().any().any():
-        raise ValueError("X_new contains NaNs after alignment; check feature engineering.")
+        logger.warning("Found NaN values in evaluation data, imputing with training medians")
+        training_medians = metadata.get("training_medians", {})
+        if training_medians:
+            for col in X_new.columns:
+                if X_new[col].isna().any() and col in training_medians:
+                    X_new[col] = X_new[col].fillna(training_medians[col])
+                    logger.info(f"Imputed {X_new[col].isna().sum()} NaN values in column '{col}' with median {training_medians[col]}")
+        else:
+            logger.warning("No training medians found in metadata, using default imputation")
+            X_new = X_new.fillna(0)
 
     y_prob = model.predict_proba(X_new)[:, 1]
 
@@ -186,15 +201,26 @@ def evaluate_on(
         out["threshold_selection"] = threshold_info
 
     if target_col and target_col in df.columns:
-        y_true = df[target_col].astype("int64").to_numpy()
-        metrics = compute_metrics(y_true, y_prob, threshold=selected_threshold)
+        # Handle NaN values in target column
+        y_true_raw = df[target_col]
+        if y_true_raw.isna().any():
+            logger.warning(f"Found {y_true_raw.isna().sum()} NaN values in target column '{target_col}', removing those rows from evaluation")
+            # Create mask for non-NaN target values
+            valid_target_mask = ~y_true_raw.isna()
+            y_true = y_true_raw[valid_target_mask].astype("int64").to_numpy()
+            y_prob_valid = y_prob[valid_target_mask]
+        else:
+            y_true = y_true_raw.astype("int64").to_numpy()
+            y_prob_valid = y_prob
+            
+        metrics = compute_metrics(y_true, y_prob_valid, threshold=selected_threshold)
         out["metrics"] = metrics.to_dict()
 
         if plot_dir:
             prefix = plot_prefix or "eval"
             out["plots"] = plot_probability_curves(
                 y_true,
-                y_prob,
+                y_prob_valid,
                 out_dir=plot_dir,
                 prefix=prefix,
             )

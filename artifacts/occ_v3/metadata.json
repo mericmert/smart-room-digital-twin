@@ -1,0 +1,90 @@
+{
+  "model_version": "v1.0",
+  "training_date": "2025-10-07T16:38:43.627463",
+  "feature_names": [
+    "Temperature",
+    "Humidity",
+    "Light",
+    "CO2",
+    "HumidityRatio",
+    "hour",
+    "dayofweek",
+    "is_weekend",
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos"
+  ],
+  "model_type": "Pipeline",
+  "performance_metrics": {
+    "average_precision": 0.9183012289509335,
+    "roc_auc": 0.9949020257688606,
+    "precision": 0.9450127877237852,
+    "recall": 0.9225967540574282,
+    "f1": 0.9336702463676564,
+    "specificity": 0.9925682682336675,
+    "balanced_accuracy": 0.9575825111455478,
+    "mcc": 0.9246990194714744,
+    "accuracy": 0.9840595111583422,
+    "prevalence": 0.12160315773493244,
+    "tn": 5743,
+    "fp": 43,
+    "fn": 62,
+    "tp": 739,
+    "threshold": 0.8649826369916238
+  },
+  "best_params": {
+    "clf__C": 0.01,
+    "clf__l1_ratio": 0.1,
+    "clf__penalty": "elasticnet",
+    "clf__solver": "saga"
+  },
+  "best_cv_average_precision": 0.9675013309165221,
+  "train_metrics": {
+    "average_precision": 0.9183012289509335,
+    "roc_auc": 0.9949020257688606,
+    "precision": 0.9450127877237852,
+    "recall": 0.9225967540574282,
+    "f1": 0.9336702463676564,
+    "specificity": 0.9925682682336675,
+    "balanced_accuracy": 0.9575825111455478,
+    "mcc": 0.9246990194714744,
+    "accuracy": 0.9840595111583422,
+    "prevalence": 0.12160315773493244,
+    "tn": 5743,
+    "fp": 43,
+    "fn": 62,
+    "tp": 739,
+    "threshold": 0.8649826369916238
+  },
+  "n_requested_splits": 3,
+  "effective_n_splits": 2,
+  "cv_fold_positive_counts": [
+    166,
+    81
+  ],
+  "gap": 2,
+  "random_state": 42,
+  "selected_threshold": 0.8649826369916238,
+  "threshold_selection": {
+    "threshold": 0.8649826369916238,
+    "objective": "f_beta",
+    "beta": 1.0,
+    "score": 0.8133971291866028,
+    "source": "temporal_cv_oof",
+    "n_oof_predictions": 4390
+  },
+  "anomaly_detection_enabled": true,
+  "anomaly_summary": {
+    "total_records": 8143,
+    "anomaly_count": 1556,
+    "anomaly_rate": 0.19108436694093087,
+    "clean_records": 6587
+  },
+  "anomaly_method": "combined",
+  "anomaly_handling": "remove",
+  "anomaly_correction_method": "median",
+  "contamination": 0.1,
+  "z_threshold": 3.0,
+  "iqr_multiplier": 1.5
+}

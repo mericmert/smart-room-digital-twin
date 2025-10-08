@@ -5,11 +5,11 @@ import os
 
 # Define anomaly thresholds
 thresholds = {
-    "Temperature": {"low": 18, "high": 28},
-    "Humidity": {"low": 30, "high": 70},
-    "Light": {"low": 10, "high": 1500},
-    "CO2": {"low": 350, "high": 1200},
-    "HumidityRatio": {"low": 0.004, "high": 0.015},
+    "Temperature": {"min": 10, "max": 40},
+    "Humidity": {"min": 0, "max": 100},
+    "Light": {"min": 0, "max": 2000},
+    "CO2": {"min": 300, "max": 2000},
+    "HumidityRatio": {"min": 0, "max": 0.02}
 }
 
 # Probability of starting an anomaly at a row

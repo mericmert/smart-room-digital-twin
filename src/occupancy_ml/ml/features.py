@@ -82,5 +82,26 @@ def build_feature_matrix(
     feature_names = list(dict.fromkeys([*numeric, *extra]))
     X = enriched[feature_names].copy()
     return X, feature_names
-    
-    
+
+
+def align_and_impute_like_train(
+    X_train: pd.DataFrame,
+    *X_tests: pd.DataFrame
+) -> Tuple[pd.DataFrame, ...]:
+    """
+    Reindex tests to train columns and impute NaNs with train medians.
+    Returns (X_train_filled, *X_tests_filled)
+    """
+    train_cols = X_train.columns
+    train_medians = X_train.median(numeric_only=True)
+    def _fix(X: pd.DataFrame) -> pd.DataFrame:
+        Z = X.reindex(columns=train_cols)
+        Z = Z.copy()
+        for c in train_cols:
+            if pd.api.types.is_numeric_dtype(Z[c]):
+                Z[c] = Z[c].fillna(train_medians.get(c, 0))
+            else:
+                Z[c] = Z[c].fillna(0)
+        return Z
+    fixed = [_fix(df) for df in (X_train, *X_tests)]
+    return tuple(fixed)

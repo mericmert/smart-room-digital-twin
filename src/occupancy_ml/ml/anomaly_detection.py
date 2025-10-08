@@ -53,11 +53,11 @@ class AnomalyDetector:
         
         # Default domain thresholds based on typical sensor ranges
         self.domain_thresholds = domain_thresholds or {
-            "Temperature": {"min": 10, "max": 40},
-            "Humidity": {"min": 0, "max": 100},
-            "Light": {"min": 0, "max": 2000},
-            "CO2": {"min": 300, "max": 2000},
-            "HumidityRatio": {"min": 0, "max": 0.02}
+            "Temperature": {"min": 18, "max": 28},
+            "Humidity": {"min": 30, "max": 70},
+            "Light": {"min": 10, "max": 1500},
+            "CO2": {"min": 350, "max": 1200},
+            "HumidityRatio": {"min": 0.004, "max": 0.015}
         }
         
         self.scaler = StandardScaler()
