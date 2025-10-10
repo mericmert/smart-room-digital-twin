@@ -4,6 +4,7 @@ import json
 import logging
 import threading
 import asyncio
+import os
 from datetime import datetime
 from typing import Callable, Dict, Any, Optional
 import pandas as pd
@@ -59,9 +60,6 @@ class EnhancedPredictionProcessor:
             }
             
             df = pd.DataFrame([record])
-            
-            # Use domain-based anomaly detection since we don't have training data
-            # Check for obvious outliers using domain thresholds
             domain_thresholds = {
                 "Temperature": {"min": 10, "max": 40},
                 "Humidity": {"min": 0, "max": 100},
@@ -151,6 +149,9 @@ class EnhancedPredictionProcessor:
 async def predictionProcessor() -> None:
     """Enhanced prediction processor that processes sensor data with anomaly detection."""
     try:
+        kafka_logger = logging.getLogger('kafka')
+        kafka_logger.setLevel(logging.WARNING)
+        
         consumer = KafkaConsumer(
             KAFKA_TOPIC,
             bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
@@ -195,6 +196,9 @@ async def predictionProcessor() -> None:
 def legacyPredictionConsumer(prediction_callback: Callable[[dict], dict]) -> None:
     """Legacy Kafka consumer that processes sensor data through ML model."""
     try:
+        kafka_logger = logging.getLogger('kafka')
+        kafka_logger.setLevel(logging.WARNING)
+        
         consumer = KafkaConsumer(
             KAFKA_TOPIC,
             bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,

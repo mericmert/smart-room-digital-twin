@@ -25,7 +25,7 @@ class EnhancedPredictionProcessor:
             # Initialize anomaly detector with combined method
             self.anomaly_detector = AnomalyDetector(
                 method="combined",
-                contamination=0.1,
+                contamination=0.15,
                 z_threshold=3.0,
                 iqr_multiplier=1.5
             )

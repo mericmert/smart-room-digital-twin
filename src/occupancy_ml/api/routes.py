@@ -14,7 +14,6 @@ from ..ml.model_manager import get_model_manager
 
 logger = logging.getLogger(__name__)
 
-# Create router for API endpoints
 router = APIRouter()
 
 

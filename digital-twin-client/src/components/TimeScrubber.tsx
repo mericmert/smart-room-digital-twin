@@ -64,10 +64,8 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
   );
   const predictionMutation = usePrediction();
 
-  // Derive currentData from dataAtTime instead of storing in state
   const currentData = dataAtTime && dataAtTime.length > 0 ? dataAtTime[0] : null;
 
-  // Compute message during render instead of using useEffect
   const message = (() => {
     if (isLoadingFiles) return 'Loading data files...';
     if (filesError) return `Error loading data files: ${filesError.message}`;
@@ -93,12 +91,10 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
     });
   }, [predictionMutation, onPrediction]);
 
-  // Handle data at time changes - notify parent and trigger prediction for manual selection
   useEffect(() => {
     if (currentData) {
       onDataSelect?.(currentData);
       
-      // Trigger prediction for manual time selection (not during playback)
       if (!isPlaying) {
         triggerPrediction(currentData);
       }
@@ -171,8 +167,6 @@ export default function TimeScrubber({ onDataSelect, onPrediction }: TimeScrubbe
     }
     
     setCurrentTime(time);
-    // React Query will automatically fetch data when currentTime changes
-    // Prediction will be triggered when dataAtTime updates (if not playing)
   };
 
   const handleFileChange = async (filename: string) => {

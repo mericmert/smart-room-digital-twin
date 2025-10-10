@@ -71,12 +71,12 @@ def cli_train() -> None:
             expected_columns=EXPECTED_COLUMNS,
             numeric_features=NUMERIC_FEATURES,
             anomaly_detection=True,
-            anomaly_method="combined",  # Best method by default
+            anomaly_method="combined",
             anomaly_handling=args.anomaly_handling,
-            anomaly_correction_method="median",  # Sensible default
-            contamination=0.1,  # Conservative default
-            z_threshold=3.0,  # Standard threshold
-            iqr_multiplier=1.5  # Standard multiplier
+            anomaly_correction_method="median", 
+            contamination=0.1,
+            z_threshold=3.0,
+            iqr_multiplier=1.5
         )
         
         if anomaly_summary:

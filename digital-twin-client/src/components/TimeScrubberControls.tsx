@@ -363,12 +363,10 @@ export default function TimeScrubberControls({ onDataSelect, onFileChange }: Tim
     }
   }, [currentTime, handleTimeChange, updateMessage]);
 
-  // Keep ref in sync with state
   useEffect(() => {
     playbackStateRef.current = playbackState;
   }, [playbackState]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) {

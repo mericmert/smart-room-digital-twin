@@ -40,7 +40,8 @@ interface ChartPoint {
   Light: number;
   CO2: number;
   HumidityRatio: number;
-  Occupancy: number;
+  ActualOccupancy: number;
+  PredictedOccupancy: number;
 }
 
 interface LiveSensorChartsProps {
@@ -74,8 +75,8 @@ export default function LiveSensorCharts({ maxPoints = 120 }: LiveSensorChartsPr
         Light: pr.features.Light,
         CO2: pr.features.CO2,
         HumidityRatio: pr.features.HumidityRatio,
-        Occupancy:
-          pr.actual_occupancy !== undefined ? pr.actual_occupancy : pr.occupancy
+        ActualOccupancy: pr.actual_occupancy !== undefined ? pr.actual_occupancy : 0,
+        PredictedOccupancy: pr.occupancy
       };
 
       const existingIndex = dataRef.current.findIndex((p) => p.time === ts);
@@ -114,17 +115,39 @@ export default function LiveSensorCharts({ maxPoints = 120 }: LiveSensorChartsPr
       {
         key: 'Temperature' as SensorKey,
         title: 'Temperature (°C)',
-        color: 'var(--color-temperature)'
+        color: 'var(--color-temperature)',
+        isOccupancy: false
       },
-      { key: 'Humidity' as SensorKey, title: 'Humidity (%)', color: 'var(--color-humidity)' },
-      { key: 'Light' as SensorKey, title: 'Light (lux)', color: 'var(--color-light)' },
-      { key: 'CO2' as SensorKey, title: 'CO2 (ppm)', color: 'var(--color-co2)' },
+      { 
+        key: 'Humidity' as SensorKey, 
+        title: 'Humidity (%)', 
+        color: 'var(--color-humidity)',
+        isOccupancy: false
+      },
+      { 
+        key: 'Light' as SensorKey, 
+        title: 'Light (lux)', 
+        color: 'var(--color-light)',
+        isOccupancy: false
+      },
+      { 
+        key: 'CO2' as SensorKey, 
+        title: 'CO2 (ppm)', 
+        color: 'var(--color-co2)',
+        isOccupancy: false
+      },
       {
         key: 'HumidityRatio' as SensorKey,
         title: 'Humidity Ratio',
-        color: 'var(--color-info)'
+        color: 'var(--color-info)',
+        isOccupancy: false
       },
-      { key: 'Occupancy' as SensorKey, title: 'Occupancy', color: 'var(--color-occupancy-occupied)' }
+      { 
+        key: 'Occupancy' as SensorKey, 
+        title: 'Occupancy', 
+        color: 'var(--color-occupancy-occupied)',
+        isOccupancy: true
+      }
     ],
     []
   );
@@ -137,7 +160,7 @@ export default function LiveSensorCharts({ maxPoints = 120 }: LiveSensorChartsPr
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {charts.map(({ key, title, color }) => (
+        {charts.map(({ key, title, color, isOccupancy }) => (
           <div key={key} className="bg-white rounded-lg border border-gray-200 p-3">
             <div className="text-sm font-medium mb-2">{title}</div>
             <div style={{ width: '100%', height: 200 }}>
@@ -158,14 +181,38 @@ export default function LiveSensorCharts({ maxPoints = 120 }: LiveSensorChartsPr
                     labelFormatter={(label) => new Date(Number(label)).toLocaleString()}
                   />
                   <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey={key}
-                    stroke={color}
-                    dot={false}
-                    isAnimationActive={false}
-                    strokeWidth={2}
-                  />
+                  {isOccupancy ? (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="ActualOccupancy"
+                        stroke="var(--color-success)"
+                        dot={false}
+                        isAnimationActive={false}
+                        strokeWidth={2}
+                        name="Actual Occupancy"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="PredictedOccupancy"
+                        stroke="var(--color-warning)"
+                        dot={false}
+                        isAnimationActive={false}
+                        strokeWidth={2}
+                        strokeDasharray="5 5"
+                        name="Predicted Occupancy"
+                      />
+                    </>
+                  ) : (
+                    <Line
+                      type="monotone"
+                      dataKey={key}
+                      stroke={color}
+                      dot={false}
+                      isAnimationActive={false}
+                      strokeWidth={2}
+                    />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             </div>

@@ -50,7 +50,6 @@ export default function SensorMetrics({ currentData }: SensorMetricsProps) {
     };
   }, []);
 
-  // Use prediction result data if available, otherwise fall back to currentData
   const displayData = predictionResult?.features ? {
     ...currentData,
     Temperature: predictionResult.features.Temperature,
@@ -62,7 +61,6 @@ export default function SensorMetrics({ currentData }: SensorMetricsProps) {
     date: predictionResult.features.timestamp || currentData?.date
   } : currentData;
 
-  // Derive human-readable anomaly reasons based on backend domain thresholds
   const anomalyReasons: string[] = (() => {
     if (!predictionResult?.is_anomaly || !predictionResult?.features) return [];
     const f = predictionResult.features;

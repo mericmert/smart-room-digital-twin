@@ -148,10 +148,16 @@ class AnomalyDetector:
         if self.method in ["isolation_forest", "combined"]:
             # Fit scaler and isolation forest
             scaled_data = self.scaler.fit_transform(data)
+            
+            effective_contamination = max(self.contamination, 0.15)  # Ensure minimum 15% contamination
+            
             self.isolation_forest = IsolationForest(
-                contamination=self.contamination,
+                contamination=effective_contamination,
                 random_state=42,
-                n_estimators=100
+                n_estimators=200,  # More trees for better detection
+                max_samples='auto',  # Use all samples for training
+                max_features=1.0,   # Use all features for better detection
+                bootstrap=False     # Use all samples without replacement
             )
             self.isolation_forest.fit(scaled_data)
             
