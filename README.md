@@ -2,7 +2,7 @@
 
 A comprehensive digital twin system for real-time occupancy prediction using machine learning, featuring a Python ML backend with FastAPI, a Next.js frontend with 3D visualization, and Apache Kafka for real-time data streaming.
 
-## 🏗️ System Architecture
+## System Architecture
 
 This project implements a complete digital twin solution with the following components:
 
@@ -11,7 +11,7 @@ This project implements a complete digital twin solution with the following comp
 - **Data Streaming**: Apache Kafka for real-time sensor data processing
 - **Deployment**: Docker-based containerization with development and production profiles
 
-## 📊 Features
+## Features
 
 ### Machine Learning Backend
 - **Temporal Cross-Validation**: Time-series aware model training
@@ -33,7 +33,7 @@ This project implements a complete digital twin solution with the following comp
 - **Anomaly Detection**: Automatic detection and handling of sensor anomalies
 - **Data Validation**: Comprehensive input validation and error handling
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Docker and Docker Compose
@@ -83,7 +83,7 @@ For production deployment with all services containerized:
 ./prod-mode.sh stop
 ```
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 digital_twin_project/
@@ -126,7 +126,7 @@ digital_twin_project/
 └── README.md                # This file
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -176,7 +176,7 @@ The system supports multiple deployment profiles:
 - **`testing`**: Kafka + test utilities
 - **`full`**: All services
 
-## 🤖 Machine Learning Pipeline
+## Machine Learning Pipeline
 
 ### Model Training
 
@@ -215,7 +215,7 @@ The system includes comprehensive anomaly detection:
 - **Domain-Specific**: Threshold-based detection for sensor ranges
 - **Combined Approach**: Multi-method ensemble detection
 
-## 🌐 API Endpoints
+## API Endpoints
 
 ### REST API
 
@@ -236,7 +236,7 @@ The system includes comprehensive anomaly detection:
 - `GET /data/{filename}` - Get data file content
 - `POST /replay` - Start data replay
 
-## 🎨 Frontend Components
+## Frontend Components
 
 ### Dashboard
 Main application interface with:
@@ -295,7 +295,7 @@ Live sensor data visualization with:
 }
 ```
 
-## 🔍 Monitoring and Observability
+## Monitoring and Observability
 
 ### Health Checks
 - API health endpoint: `GET /health`
